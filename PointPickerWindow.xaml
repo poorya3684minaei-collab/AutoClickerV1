@@ -5,21 +5,40 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="#01000000"
-        WindowState="Maximized"
+        ShowInTaskbar="False"
         Topmost="True"
         Cursor="Cross"
         KeyDown="Window_KeyDown"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
     <Grid>
-        <TextBlock Text="روی نقطه مورد نظر کلیک کنید  |  Esc برای لغو"
-                   FontSize="22"
-                   FontWeight="Bold"
-                   Foreground="White"
-                   Background="#AA000000"
-                   Padding="20"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Top"
-                   Margin="0,40,0,0"/>
+        <Border Background="#CC000000"
+                CornerRadius="8"
+                Padding="22"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,35,0,0">
+
+            <StackPanel>
+                <TextBlock Text="انتخاب نقطه"
+                           Foreground="White"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"/>
+
+                <TextBlock Text="روی محل موردنظر کلیک کنید"
+                           Foreground="White"
+                           FontSize="17"
+                           Margin="0,8,0,0"
+                           HorizontalAlignment="Center"/>
+
+                <TextBlock Text="Esc برای لغو"
+                           Foreground="#DDDDDD"
+                           FontSize="14"
+                           Margin="0,5,0,0"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+        </Border>
     </Grid>
 </Window>
