@@ -10,24 +10,18 @@
 
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-
-    <!-- اجازه استفاده از قابلیت‌های جدید زبان C# -->
     <LangVersion>latest</LangVersion>
 
     <AssemblyName>AutoClickerV1</AssemblyName>
     <RootNamespace>AutoClickerV1</RootNamespace>
 
-    <!-- خروجی مستقل برای 32 و 64 بیت -->
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <!-- Restore dependencies for both 32-bit and 64-bit Windows -->
+    <RuntimeIdentifiers>win-x86;win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
 
-    <!--
-      Reference Assemblies مربوط به .NET Framework 4.8
-      باعث می‌شود GitHub Actions بدون نیاز به نصب Developer Pack
-      بتواند پروژه را Build کند.
-    -->
+    <!-- .NET Framework 4.8 reference assemblies -->
     <PackageReference
       Include="Microsoft.NETFramework.ReferenceAssemblies"
       Version="1.0.3"
