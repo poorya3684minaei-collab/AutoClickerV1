@@ -1,0 +1,232 @@
+using AutoClickerV1.Models;
+using AutoClickerV1.Services;
+using System.Collections.ObjectModel;
+using System.Drawing;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+
+namespace AutoClickerV1;
+
+public partial class MainWindow : Window
+{
+    private readonly MouseService _mouse = new();
+    private readonly SequenceRunner _runner;
+    private readonly ObservableCollection<ClickPoint> _points = new();
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        _runner = new SequenceRunner(_mouse);
+        PointsList.ItemsSource = _points;
+    }
+
+    private async void AddPoint_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new PointPickerWindow
+            {
+                Owner = this
+            };
+
+            Hide();
+            picker.ShowDialog();
+            Show();
+            Activate();
+
+            if (picker.SelectedPoint is not Point p)
+                return;
+
+            var color = _mouse.GetPixelColor(p.X, p.Y);
+
+            var point = new ClickPoint
+            {
+                Number = _points.Count + 1,
+                X = p.X,
+                Y = p.Y,
+                DelayMs = 1000,
+                R = color.R,
+                G = color.G,
+                B = color.B,
+                CheckMode = CheckMode.None
+            };
+
+            _points.Add(point);
+            PointsList.SelectedItem = point;
+            RefreshEditor();
+            StatusText.Text = $"نقطه {point.Number} اضافه شد. مختصات: ({point.X}, {point.Y}) | رنگ: {point.ColorHex}";
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    private void PointsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RefreshEditor();
+    }
+
+    private void RefreshEditor()
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+        {
+            ColorInfoText.Text = "—";
+            DelayBox.Text = "1.0";
+            ToleranceBox.Text = "10";
+            return;
+        }
+
+        DelayBox.Text = (point.DelayMs / 1000.0).ToString("0.###", CultureInfo.InvariantCulture);
+        ToleranceBox.Text = point.Tolerance.ToString();
+        ColorInfoText.Text = $"{point.ColorHex} | ({point.X}, {point.Y})";
+    }
+
+    private void ApplyDelay_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        if (!double.TryParse(
+                DelayBox.Text.Replace(',', '.'),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var seconds) || seconds < 0)
+        {
+            MessageBox.Show("تاخیر باید یک عدد صفر یا بزرگ‌تر باشد.", "خطا",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        point.DelayMs = (int)Math.Round(seconds * 1000);
+        PointsList.Items.Refresh();
+        StatusText.Text = $"تاخیر نقطه {point.Number} به {point.DelayText} تغییر کرد.";
+    }
+
+    private void EnableColorCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        if (!int.TryParse(ToleranceBox.Text, out var tolerance) || tolerance < 0 || tolerance > 255)
+        {
+            MessageBox.Show("Tolerance باید بین 0 تا 255 باشد.", "خطا",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        point.Tolerance = tolerance;
+        point.CheckMode = CheckMode.Color;
+
+        PointsList.Items.Refresh();
+        StatusText.Text = $"بررسی رنگ برای نقطه {point.Number} فعال شد.";
+    }
+
+    private void DisableColorCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        point.CheckMode = CheckMode.None;
+        PointsList.Items.Refresh();
+        StatusText.Text = $"بررسی رنگ برای نقطه {point.Number} غیرفعال شد.";
+    }
+
+    private async void Start_Click(object sender, RoutedEventArgs e)
+    {
+        if (_runner.IsRunning)
+            return;
+
+        int repeatCount = 1;
+
+        if (!InfiniteCheckBox.IsChecked.GetValueOrDefault())
+        {
+            if (!int.TryParse(RepeatCountBox.Text, out repeatCount) || repeatCount < 1)
+            {
+                MessageBox.Show("تعداد تکرار باید حداقل 1 باشد.", "خطا",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+
+        try
+        {
+            StatusText.Text = "در حال اجرا...";
+            await _runner.StartAsync(
+                _points.ToList(),
+                repeatCount,
+                InfiniteCheckBox.IsChecked.GetValueOrDefault(),
+                status => Dispatcher.Invoke(() => StatusText.Text = status),
+                point => Dispatcher.Invoke(() => PointsList.SelectedItem = point));
+
+            if (!_runner.IsRunning)
+                StatusText.Text = "اجرا تمام شد.";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "اجرا متوقف شد.";
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    private void Stop_Click(object sender, RoutedEventArgs e)
+    {
+        _runner.Stop();
+        StatusText.Text = "در حال توقف...";
+    }
+
+    private void DeletePoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        _points.Remove(point);
+
+        for (int i = 0; i < _points.Count; i++)
+            _points[i].Number = i + 1;
+
+        PointsList.Items.Refresh();
+        RefreshEditor();
+        StatusText.Text = "نقطه حذف شد.";
+    }
+
+    private void EditColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        try
+        {
+            var c = _mouse.GetPixelColor(point.X, point.Y);
+            point.R = c.R;
+            point.G = c.G;
+            point.B = c.B;
+
+            PointsList.Items.Refresh();
+            RefreshEditor();
+            StatusText.Text = $"رنگ نقطه {point.Number} به رنگ فعلی صفحه تغییر کرد: {point.ColorHex}";
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    private void Infinite_Checked(object sender, RoutedEventArgs e)
+        => RepeatCountBox.IsEnabled = false;
+
+    private void Infinite_Unchecked(object sender, RoutedEventArgs e)
+        => RepeatCountBox.IsEnabled = true;
+
+    private void ShowError(Exception ex)
+    {
+        Show();
+        MessageBox.Show(ex.Message, "خطا", MessageBoxButton.OK, MessageBoxImage.Error);
+        StatusText.Text = "خطا";
+    }
+}
