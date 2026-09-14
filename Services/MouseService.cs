@@ -8,9 +8,13 @@ public class MouseService
 {
     private const uint INPUT_MOUSE = 0;
 
-    private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP = 0x0004;
+
+    private const int SM_XVIRTUALSCREEN = 76;
+    private const int SM_YVIRTUALSCREEN = 77;
+    private const int SM_CXVIRTUALSCREEN = 78;
+    private const int SM_CYVIRTUALSCREEN = 79;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
@@ -37,12 +41,30 @@ public class MouseService
         public IntPtr dwExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
     [DllImport(
         "user32.dll",
         SetLastError = true)]
     private static extern bool SetCursorPos(
         int X,
         int Y);
+
+    [DllImport(
+        "user32.dll",
+        SetLastError = true)]
+    private static extern bool GetCursorPos(
+        out POINT point);
+
+    [DllImport(
+        "user32.dll")]
+    private static extern int GetSystemMetrics(
+        int nIndex);
 
     [DllImport(
         "user32.dll",
@@ -104,7 +126,7 @@ public class MouseService
         uint sent = SendInput(
             (uint)inputs.Length,
             inputs,
-            Marshal.SizeOf<INPUT>());
+            Marshal.SizeOf(typeof(INPUT)));
 
         if (sent != inputs.Length)
         {
@@ -115,7 +137,8 @@ public class MouseService
 
     public Color GetPixelColor(int x, int y)
     {
-        using var bitmap = new Bitmap(1, 1);
+        using var bitmap =
+            new Bitmap(1, 1);
 
         using var graphics =
             Graphics.FromImage(bitmap);
@@ -131,10 +154,164 @@ public class MouseService
     }
 
     /// <summary>
-    /// بررسی می‌کند آیا رنگ موردنظر در محدوده اطراف نقطه
-    /// به اندازه کافی وجود دارد یا خیر.
-    ///
-    /// به جای بررسی فقط یک پیکسل، کل محدوده بررسی می‌شود.
+    /// رنگ نماینده محدوده اطراف نقطه را پیدا می‌کند.
+    /// برای حباب‌های رنگی مثل زرد مناسب‌تر از یک پیکسل منفرد است.
+    /// </summary>
+    public Color GetRepresentativeColor(
+        int x,
+        int y,
+        int searchRadius)
+    {
+        if (searchRadius < 2)
+            searchRadius = 2;
+
+        if (searchRadius > 100)
+            searchRadius = 100;
+
+        GetVirtualScreenBounds(
+            out int virtualLeft,
+            out int virtualTop,
+            out int virtualWidth,
+            out int virtualHeight);
+
+        int requestedLeft =
+            x - searchRadius;
+
+        int requestedTop =
+            y - searchRadius;
+
+        int requestedRight =
+            x + searchRadius;
+
+        int requestedBottom =
+            y + searchRadius;
+
+        int left =
+            Math.Max(
+                requestedLeft,
+                virtualLeft);
+
+        int top =
+            Math.Max(
+                requestedTop,
+                virtualTop);
+
+        int right =
+            Math.Min(
+                requestedRight,
+                virtualLeft + virtualWidth - 1);
+
+        int bottom =
+            Math.Min(
+                requestedBottom,
+                virtualTop + virtualHeight - 1);
+
+        if (right < left ||
+            bottom < top)
+        {
+            return GetPixelColor(x, y);
+        }
+
+        int width =
+            right - left + 1;
+
+        int height =
+            bottom - top + 1;
+
+        using var bitmap =
+            new Bitmap(width, height);
+
+        using var graphics =
+            Graphics.FromImage(bitmap);
+
+        graphics.CopyFromScreen(
+            left,
+            top,
+            0,
+            0,
+            new System.Drawing.Size(
+                width,
+                height));
+
+        long totalR = 0;
+        long totalG = 0;
+        long totalB = 0;
+
+        int count = 0;
+
+        int centerX =
+            x - left;
+
+        int centerY =
+            y - top;
+
+        // ابتدا پیکسل‌های نسبتاً اشباع را بررسی می‌کنیم.
+        // این کار باعث می‌شود حباب زرد از زمینه سفید/خاکستری
+        // بهتر تشخیص داده شود.
+        long saturatedR = 0;
+        long saturatedG = 0;
+        long saturatedB = 0;
+        int saturatedCount = 0;
+
+        for (int py = 0; py < height; py++)
+        {
+            for (int px = 0; px < width; px++)
+            {
+                Color c =
+                    bitmap.GetPixel(px, py);
+
+                totalR += c.R;
+                totalG += c.G;
+                totalB += c.B;
+                count++;
+
+                int max =
+                    Math.Max(
+                        c.R,
+                        Math.Max(c.G, c.B));
+
+                int min =
+                    Math.Min(
+                        c.R,
+                        Math.Min(c.G, c.B));
+
+                int saturation =
+                    max - min;
+
+                if (saturation >= 45)
+                {
+                    saturatedR += c.R;
+                    saturatedG += c.G;
+                    saturatedB += c.B;
+                    saturatedCount++;
+                }
+            }
+        }
+
+        if (saturatedCount >= 3)
+        {
+            return Color.FromArgb(
+                255,
+                (int)(saturatedR / saturatedCount),
+                (int)(saturatedG / saturatedCount),
+                (int)(saturatedB / saturatedCount));
+        }
+
+        if (count > 0)
+        {
+            return Color.FromArgb(
+                255,
+                (int)(totalR / count),
+                (int)(totalG / count),
+                (int)(totalB / count));
+        }
+
+        return GetPixelColor(x, y);
+    }
+
+    /// <summary>
+    /// بررسی وجود رنگ در محدوده اطراف نقطه.
+    /// محدوده با مرز واقعی دسکتاپ مجازی Windows قطع می‌شود.
     /// </summary>
     public bool IsColorMatchInRegion(
         int x,
@@ -146,41 +323,73 @@ public class MouseService
         int searchRadius,
         int minimumMatchPercent)
     {
-        if (tolerance < 0)
-            tolerance = 0;
+        tolerance =
+            Math.Max(
+                0,
+                Math.Min(255, tolerance));
 
-        if (tolerance > 255)
-            tolerance = 255;
+        searchRadius =
+            Math.Max(
+                1,
+                Math.Min(100, searchRadius));
 
-        if (searchRadius < 1)
-            searchRadius = 1;
+        minimumMatchPercent =
+            Math.Max(
+                0,
+                Math.Min(100, minimumMatchPercent));
 
-        if (searchRadius > 100)
-            searchRadius = 100;
+        GetVirtualScreenBounds(
+            out int virtualLeft,
+            out int virtualTop,
+            out int virtualWidth,
+            out int virtualHeight);
 
-        if (minimumMatchPercent < 0)
-            minimumMatchPercent = 0;
-
-        if (minimumMatchPercent > 100)
-            minimumMatchPercent = 100;
-
-        int size =
-            (searchRadius * 2) + 1;
-
-        int left =
+        int requestedLeft =
             x - searchRadius;
 
-        int top =
+        int requestedTop =
             y - searchRadius;
 
-        int matchingPixels = 0;
+        int requestedRight =
+            x + searchRadius;
 
-        int totalPixels = 0;
+        int requestedBottom =
+            y + searchRadius;
+
+        int left =
+            Math.Max(
+                requestedLeft,
+                virtualLeft);
+
+        int top =
+            Math.Max(
+                requestedTop,
+                virtualTop);
+
+        int right =
+            Math.Min(
+                requestedRight,
+                virtualLeft + virtualWidth - 1);
+
+        int bottom =
+            Math.Min(
+                requestedBottom,
+                virtualTop + virtualHeight - 1);
+
+        if (right < left ||
+            bottom < top)
+        {
+            return false;
+        }
+
+        int width =
+            right - left + 1;
+
+        int height =
+            bottom - top + 1;
 
         using var bitmap =
-            new Bitmap(
-                size,
-                size);
+            new Bitmap(width, height);
 
         using var graphics =
             Graphics.FromImage(bitmap);
@@ -193,15 +402,18 @@ public class MouseService
                 0,
                 0,
                 new System.Drawing.Size(
-                    size,
-                    size));
+                    width,
+                    height));
+
+            int matchingPixels = 0;
+            int totalPixels = 0;
 
             for (int py = 0;
-                 py < size;
+                 py < height;
                  py++)
             {
                 for (int px = 0;
-                     px < size;
+                     px < width;
                      px++)
                 {
                     Color current =
@@ -211,42 +423,45 @@ public class MouseService
 
                     totalPixels++;
 
-                    if (
+                    int dr =
                         Math.Abs(
-                            current.R - r) <= tolerance
-                        &&
+                            current.R - r);
+
+                    int dg =
                         Math.Abs(
-                            current.G - g) <= tolerance
-                        &&
+                            current.G - g);
+
+                    int db =
                         Math.Abs(
-                            current.B - b) <= tolerance)
+                            current.B - b);
+
+                    if (dr <= tolerance &&
+                        dg <= tolerance &&
+                        db <= tolerance)
                     {
                         matchingPixels++;
                     }
                 }
             }
+
+            if (totalPixels == 0)
+                return false;
+
+            double percentage =
+                matchingPixels * 100.0 /
+                totalPixels;
+
+            return percentage >=
+                   minimumMatchPercent;
         }
         catch
         {
-            // اگر محدوده در لبه صفحه یا شرایط خاصی
-            // قابل خواندن نبود، رنگ را نامعتبر در نظر می‌گیریم.
             return false;
         }
-
-        if (totalPixels == 0)
-            return false;
-
-        double matchPercent =
-            (matchingPixels * 100.0) /
-            totalPixels;
-
-        return matchPercent >=
-               minimumMatchPercent;
     }
 
     /// <summary>
-    /// نسخه قدیمی برای سازگاری با کدهای احتمالی دیگر پروژه.
-    /// فقط همان یک پیکسل را بررسی می‌کند.
+    /// نسخه تک‌پیکسلی برای سازگاری.
     /// </summary>
     public bool IsColorMatch(
         int x,
@@ -256,11 +471,10 @@ public class MouseService
         byte b,
         int tolerance)
     {
-        if (tolerance < 0)
-            tolerance = 0;
-
-        if (tolerance > 255)
-            tolerance = 255;
+        tolerance =
+            Math.Max(
+                0,
+                Math.Min(255, tolerance));
 
         Color current =
             GetPixelColor(x, y);
@@ -269,5 +483,51 @@ public class MouseService
             Math.Abs(current.R - r) <= tolerance &&
             Math.Abs(current.G - g) <= tolerance &&
             Math.Abs(current.B - b) <= tolerance;
+    }
+
+    public bool TryGetCursorPosition(
+        out int x,
+        out int y)
+    {
+        if (GetCursorPos(out POINT point))
+        {
+            x = point.X;
+            y = point.Y;
+            return true;
+        }
+
+        x = 0;
+        y = 0;
+
+        return false;
+    }
+
+    private static void GetVirtualScreenBounds(
+        out int left,
+        out int top,
+        out int width,
+        out int height)
+    {
+        left =
+            GetSystemMetrics(
+                SM_XVIRTUALSCREEN);
+
+        top =
+            GetSystemMetrics(
+                SM_YVIRTUALSCREEN);
+
+        width =
+            GetSystemMetrics(
+                SM_CXVIRTUALSCREEN);
+
+        height =
+            GetSystemMetrics(
+                SM_CYVIRTUALSCREEN);
+
+        if (width <= 0)
+            width = 1;
+
+        if (height <= 0)
+            height = 1;
     }
 }
