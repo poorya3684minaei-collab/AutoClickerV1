@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Auto Clicker V1"
-        Width="900"
-        Height="650"
-        MinWidth="750"
-        MinHeight="550"
+        Width="950"
+        Height="720"
+        MinWidth="800"
+        MinHeight="600"
         WindowStartupLocation="CenterScreen"
         Background="#F4F6F8">
 
@@ -25,7 +25,6 @@
                     Value="Hand"/>
         </Style>
 
-
         <Style x:Key="SmallButtonStyle"
                TargetType="Button">
             <Setter Property="Margin"
@@ -36,7 +35,6 @@
                     Value="Hand"/>
         </Style>
 
-
         <Style TargetType="TextBox">
             <Setter Property="Margin"
                     Value="4"/>
@@ -45,7 +43,6 @@
             <Setter Property="FontSize"
                     Value="14"/>
         </Style>
-
 
         <Style TargetType="GroupBox">
             <Setter Property="Margin"
@@ -56,7 +53,6 @@
 
     </Window.Resources>
 
-
     <Grid Margin="12">
 
         <Grid.RowDefinitions>
@@ -64,7 +60,6 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
 
         <!-- عنوان -->
 
@@ -90,16 +85,14 @@
 
         </Border>
 
-
         <!-- محتوای اصلی -->
 
         <Grid Grid.Row="1">
 
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="310"/>
+                <ColumnDefinition Width="330"/>
             </Grid.ColumnDefinitions>
-
 
             <!-- لیست نقاط -->
 
@@ -114,9 +107,6 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-
-                    <!-- دکمه‌های نقاط -->
-
                     <WrapPanel Grid.Row="0"
                                Margin="0,0,0,8">
 
@@ -125,22 +115,17 @@
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Click="AddPoint_Click"/>
 
-
                         <Button x:Name="DeletePointButton"
                                 Content="حذف نقطه"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="DeletePoint_Click"/>
 
-
                         <Button x:Name="EditColorButton"
-                                Content="به‌روزرسانی رنگ"
+                                Content="ثبت دوباره رنگ"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="EditColor_Click"/>
 
                     </WrapPanel>
-
-
-                    <!-- لیست نقاط -->
 
                     <ListBox x:Name="PointsList"
                              Grid.Row="1"
@@ -162,15 +147,13 @@
                                             <ColumnDefinition Width="55"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="110"/>
-                                            <ColumnDefinition Width="90"/>
+                                            <ColumnDefinition Width="100"/>
                                         </Grid.ColumnDefinitions>
-
 
                                         <TextBlock Grid.Column="0"
                                                    Text="{Binding Number, StringFormat=№ {0}}"
                                                    FontWeight="Bold"
                                                    VerticalAlignment="Center"/>
-
 
                                         <StackPanel Grid.Column="1">
 
@@ -183,22 +166,19 @@
 
                                             </TextBlock>
 
-
                                             <TextBlock Text="{Binding ColorHex}"
                                                        Foreground="#6B7280"
                                                        Margin="0,3,0,0"/>
 
                                         </StackPanel>
 
-
                                         <TextBlock Grid.Column="2"
                                                    Text="{Binding DelayText}"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Center"/>
 
-
                                         <TextBlock Grid.Column="3"
-                                                   Text="{Binding CheckMode}"
+                                                   Text="{Binding CheckModeText}"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Center"/>
 
@@ -212,11 +192,8 @@
 
                     </ListBox>
 
-
-                    <!-- راهنما -->
-
                     <TextBlock Grid.Row="2"
-                               Text="برای افزودن نقطه، روی «افزودن نقطه» بزنید و سپس محل موردنظر را روی صفحه انتخاب کنید."
+                               Text="هر نقطه رنگ، فاصله و تنظیمات بررسی مستقل خودش را دارد. فاصله نقطه آخر تا نقطه اول نیز مستقل است."
                                Foreground="#6B7280"
                                TextWrapping="Wrap"
                                Margin="5,10,5,3"/>
@@ -224,7 +201,6 @@
                 </Grid>
 
             </GroupBox>
-
 
             <!-- تنظیمات -->
 
@@ -240,13 +216,9 @@
                                    FontWeight="Bold"
                                    Margin="5,5,5,12"/>
 
-
-                        <!-- رنگ -->
-
                         <TextBlock Text="رنگ ذخیره‌شده:"
                                    FontWeight="SemiBold"
                                    Margin="5,3"/>
-
 
                         <Border Background="#E5E7EB"
                                 CornerRadius="5"
@@ -260,7 +232,6 @@
 
                         </Border>
 
-
                         <!-- فاصله -->
 
                         <TextBlock x:Name="DelayLabel"
@@ -269,18 +240,14 @@
                                    TextWrapping="Wrap"
                                    Margin="5,15,5,3"/>
 
-
                         <TextBox x:Name="DelayBox"
                                  Text="1.0"/>
-
 
                         <Button Content="اعمال فاصله"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="ApplyDelay_Click"/>
 
-
                         <Separator Margin="5,15"/>
-
 
                         <!-- بررسی رنگ -->
 
@@ -289,28 +256,36 @@
                                    FontWeight="Bold"
                                    Margin="5,5,5,10"/>
 
-
                         <TextBlock Text="Tolerance"
                                    FontWeight="SemiBold"
                                    Margin="5,3"/>
 
-
                         <TextBox x:Name="ToleranceBox"
-                                 Text="10"/>
+                                 Text="20"/>
 
+                        <TextBlock Text="شعاع جست‌وجو (پیکسل)"
+                                   FontWeight="SemiBold"
+                                   Margin="5,8,5,3"/>
+
+                        <TextBox x:Name="SearchRadiusBox"
+                                 Text="15"/>
+
+                        <TextBlock Text="حداقل درصد تطابق"
+                                   FontWeight="SemiBold"
+                                   Margin="5,8,5,3"/>
+
+                        <TextBox x:Name="MinimumMatchPercentBox"
+                                 Text="5"/>
 
                         <Button Content="فعال کردن بررسی رنگ"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="EnableColorCheck_Click"/>
 
-
                         <Button Content="غیرفعال کردن بررسی رنگ"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="DisableColorCheck_Click"/>
 
-
                         <Separator Margin="5,15"/>
-
 
                         <!-- تعداد تکرار -->
 
@@ -319,10 +294,8 @@
                                    FontWeight="Bold"
                                    Margin="5,5,5,10"/>
 
-
                         <TextBox x:Name="RepeatCountBox"
                                  Text="1"/>
-
 
                         <CheckBox x:Name="InfiniteCheckBox"
                                   Content="تکرار نامحدود"
@@ -330,9 +303,7 @@
                                   Checked="Infinite_Checked"
                                   Unchecked="Infinite_Unchecked"/>
 
-
                         <Separator Margin="5,15"/>
-
 
                         <!-- اجرا -->
 
@@ -343,7 +314,6 @@
                                 Padding="10"
                                 Margin="4"
                                 Click="Start_Click"/>
-
 
                         <Button x:Name="StopButton"
                                 Content="■  توقف"
@@ -360,7 +330,6 @@
             </GroupBox>
 
         </Grid>
-
 
         <!-- وضعیت -->
 
