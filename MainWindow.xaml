@@ -1,213 +1,232 @@
-<Window x:Class="AutoClickerV1.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Auto Clicker V1"
-        Width="1080"
-        Height="650"
-        MinWidth="900"
-        MinHeight="560"
-        WindowStartupLocation="CenterScreen">
+using AutoClickerV1.Models;
+using AutoClickerV1.Services;
+using System.Collections.ObjectModel;
+using System.Drawing;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 
-    <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+namespace AutoClickerV1;
 
-        <DockPanel Grid.Row="0" Margin="0,0,0,14">
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                <Button Content="＋ افزودن نقطه"
-                        Width="135"
-                        Height="38"
-                        Margin="0,0,8,0"
-                        Click="AddPoint_Click"/>
-                <Button Content="✎ ویرایش رنگ"
-                        Width="125"
-                        Height="38"
-                        Margin="0,0,8,0"
-                        Click="EditColor_Click"/>
-                <Button Content="حذف نقطه"
-                        Width="105"
-                        Height="38"
-                        Click="DeletePoint_Click"/>
-            </StackPanel>
+public partial class MainWindow : Window
+{
+    private readonly MouseService _mouse = new();
+    private readonly SequenceRunner _runner;
+    private readonly ObservableCollection<ClickPoint> _points = new();
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="▶ شروع"
-                        Width="100"
-                        Height="38"
-                        Margin="8,0,8,0"
-                        Click="Start_Click"
-                        Background="#2E8B57"
-                        Foreground="White"/>
-                <Button Content="■ توقف"
-                        Width="100"
-                        Height="38"
-                        Click="Stop_Click"
-                        Background="#B22222"
-                        Foreground="White"/>
-            </StackPanel>
-        </DockPanel>
+    public MainWindow()
+    {
+        InitializeComponent();
+        _runner = new SequenceRunner(_mouse);
+        PointsList.ItemsSource = _points;
+    }
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="300"/>
-            </Grid.ColumnDefinitions>
+    private async void AddPoint_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new PointPickerWindow
+            {
+                Owner = this
+            };
 
-            <Border Grid.Column="0"
-                    BorderBrush="#DDDDDD"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Padding="8"
-                    Margin="0,0,14,0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            Hide();
+            picker.ShowDialog();
+            Show();
+            Activate();
 
-                    <Grid Grid.Row="0" Background="#F1F1F1" Height="38">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="60"/>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="#" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="Bold"/>
-                        <TextBlock Grid.Column="1" Text="X" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="Bold"/>
-                        <TextBlock Grid.Column="2" Text="Y" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="Bold"/>
-                        <TextBlock Grid.Column="3" Text="تاخیر" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="Bold"/>
-                        <TextBlock Grid.Column="4" Text="بررسی رنگ" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="Bold"/>
-                        <TextBlock Grid.Column="5" Text="رنگ ذخیره‌شده" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="Bold"/>
-                    </Grid>
+            if (picker.SelectedPoint is not System.Windows.Point p)
+                return;
 
-                    <ListView x:Name="PointsList"
-                              Grid.Row="1"
-                              Margin="0,6,0,0"
-                              SelectionChanged="PointsList_SelectionChanged">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="#" Width="60"
-                                                DisplayMemberBinding="{Binding Number}"/>
-                                <GridViewColumn Header="X" Width="100"
-                                                DisplayMemberBinding="{Binding X}"/>
-                                <GridViewColumn Header="Y" Width="100"
-                                                DisplayMemberBinding="{Binding Y}"/>
-                                <GridViewColumn Header="تاخیر" Width="110"
-                                                DisplayMemberBinding="{Binding DelayText}"/>
-                                <GridViewColumn Header="بررسی رنگ" Width="120">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <CheckBox IsChecked="{Binding CheckMode}"
-                                                      IsEnabled="False"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="رنگ" Width="140">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal">
-                                                <Border Width="22" Height="22"
-                                                        Background="#FFFFFF"
-                                                        BorderBrush="#555"
-                                                        BorderThickness="1"
-                                                        Margin="2,0,8,0"/>
-                                                <TextBlock Text="{Binding ColorHex}" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-                </Grid>
-            </Border>
+            var color = _mouse.GetPixelColor((int)p.X, (int)p.Y);
 
-            <Border Grid.Column="1"
-                    BorderBrush="#DDDDDD"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Padding="16">
-                <StackPanel>
-                    <TextBlock Text="تنظیمات اجرا"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Margin="0,0,0,18"/>
+            var point = new ClickPoint
+            {
+                Number = _points.Count + 1,
+                X = (int)p.X,
+                Y = (int)p.Y,
+                DelayMs = 1000,
+                R = color.R,
+                G = color.G,
+                B = color.B,
+                CheckMode = CheckMode.None
+            };
 
-                    <TextBlock Text="تعداد تکرار" Margin="0,0,0,5"/>
-                    <TextBox x:Name="RepeatCountBox"
-                             Text="1"
-                             Height="34"
-                             Padding="8"
-                             Margin="0,0,0,12"/>
+            _points.Add(point);
+            PointsList.SelectedItem = point;
+            RefreshEditor();
+            StatusText.Text = $"نقطه {point.Number} اضافه شد. مختصات: ({point.X}, {point.Y}) | رنگ: {point.ColorHex}";
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
+    }
 
-                    <CheckBox x:Name="InfiniteCheckBox"
-                              Content="تکرار نامحدود"
-                              Margin="0,0,0,18"
-                              Checked="Infinite_Checked"
-                              Unchecked="Infinite_Unchecked"/>
+    private void PointsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RefreshEditor();
+    }
 
-                    <TextBlock Text="تاخیر نقطه انتخاب‌شده (ثانیه)"
-                               Margin="0,0,0,5"/>
-                    <TextBox x:Name="DelayBox"
-                             Text="1.0"
-                             Height="34"
-                             Padding="8"
-                             Margin="0,0,0,8"/>
+    private void RefreshEditor()
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+        {
+            ColorInfoText.Text = "—";
+            DelayBox.Text = "1.0";
+            ToleranceBox.Text = "10";
+            return;
+        }
 
-                    <Button Content="اعمال تاخیر"
-                            Height="34"
-                            Margin="0,0,0,18"
-                            Click="ApplyDelay_Click"/>
+        DelayBox.Text = (point.DelayMs / 1000.0).ToString("0.###", CultureInfo.InvariantCulture);
+        ToleranceBox.Text = point.Tolerance.ToString();
+        ColorInfoText.Text = $"{point.ColorHex} | ({point.X}, {point.Y})";
+    }
 
-                    <TextBlock Text="رنگ نقطه انتخاب‌شده"
-                               Margin="0,0,0,5"/>
-                    <TextBlock x:Name="ColorInfoText"
-                               Text="—"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,18"/>
+    private void ApplyDelay_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
 
-                    <TextBlock Text="تحمل اختلاف رنگ"
-                               Margin="0,0,0,5"/>
-                    <TextBox x:Name="ToleranceBox"
-                             Text="10"
-                             Height="34"
-                             Padding="8"
-                             Margin="0,0,0,14"/>
+        if (!double.TryParse(
+                DelayBox.Text.Replace(',', '.'),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var seconds) || seconds < 0)
+        {
+            MessageBox.Show("تاخیر باید یک عدد صفر یا بزرگ‌تر باشد.", "خطا",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
-                    <Button Content="فعال کردن بررسی رنگ برای این نقطه"
-                            Height="42"
-                            Click="EnableColorCheck_Click"/>
+        point.DelayMs = (int)Math.Round(seconds * 1000);
+        PointsList.Items.Refresh();
+        StatusText.Text = $"تاخیر نقطه {point.Number} به {point.DelayText} تغییر کرد.";
+    }
 
-                    <Button Content="غیرفعال کردن بررسی رنگ"
-                            Height="38"
-                            Margin="0,8,0,0"
-                            Click="DisableColorCheck_Click"/>
+    private void EnableColorCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
 
-                    <Separator Margin="0,18,0,12"/>
+        if (!int.TryParse(ToleranceBox.Text, out var tolerance) || tolerance < 0 || tolerance > 255)
+        {
+            MessageBox.Show("Tolerance باید بین 0 تا 255 باشد.", "خطا",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
-                    <TextBlock x:Name="StatusText"
-                               Text="آماده"
-                               TextWrapping="Wrap"
-                               Foreground="#444444"/>
-                </StackPanel>
-            </Border>
-        </Grid>
+        point.Tolerance = tolerance;
+        point.CheckMode = CheckMode.Color;
 
-        <Border Grid.Row="2"
-                Margin="0,14,0,0"
-                Padding="10"
-                Background="#F7F7F7"
-                BorderBrush="#DDDDDD"
-                BorderThickness="1"
-                CornerRadius="6">
-            <TextBlock Text="نکته: وقتی بررسی رنگ فعال باشد، اگر رنگ آن نقطه با رنگ ذخیره‌شده در محدوده تحمل نباشد، آن کلیک انجام نمی‌شود."
-                       Foreground="#444444"/>
-        </Border>
-    </Grid>
-</Window>
+        PointsList.Items.Refresh();
+        StatusText.Text = $"بررسی رنگ برای نقطه {point.Number} فعال شد.";
+    }
+
+    private void DisableColorCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        point.CheckMode = CheckMode.None;
+        PointsList.Items.Refresh();
+        StatusText.Text = $"بررسی رنگ برای نقطه {point.Number} غیرفعال شد.";
+    }
+
+    private async void Start_Click(object sender, RoutedEventArgs e)
+    {
+        if (_runner.IsRunning)
+            return;
+
+        int repeatCount = 1;
+
+        if (!InfiniteCheckBox.IsChecked.GetValueOrDefault())
+        {
+            if (!int.TryParse(RepeatCountBox.Text, out repeatCount) || repeatCount < 1)
+            {
+                MessageBox.Show("تعداد تکرار باید حداقل 1 باشد.", "خطا",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+
+        try
+        {
+            StatusText.Text = "در حال اجرا...";
+            await _runner.StartAsync(
+                _points.ToList(),
+                repeatCount,
+                InfiniteCheckBox.IsChecked.GetValueOrDefault(),
+                status => Dispatcher.Invoke(() => StatusText.Text = status),
+                point => Dispatcher.Invoke(() => PointsList.SelectedItem = point));
+
+            if (!_runner.IsRunning)
+                StatusText.Text = "اجرا تمام شد.";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "اجرا متوقف شد.";
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    private void Stop_Click(object sender, RoutedEventArgs e)
+    {
+        _runner.Stop();
+        StatusText.Text = "در حال توقف...";
+    }
+
+    private void DeletePoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        _points.Remove(point);
+
+        for (int i = 0; i < _points.Count; i++)
+            _points[i].Number = i + 1;
+
+        PointsList.Items.Refresh();
+        RefreshEditor();
+        StatusText.Text = "نقطه حذف شد.";
+    }
+
+    private void EditColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (PointsList.SelectedItem is not ClickPoint point)
+            return;
+
+        try
+        {
+            var c = _mouse.GetPixelColor(point.X, point.Y);
+            point.R = c.R;
+            point.G = c.G;
+            point.B = c.B;
+
+            PointsList.Items.Refresh();
+            RefreshEditor();
+            StatusText.Text = $"رنگ نقطه {point.Number} به رنگ فعلی صفحه تغییر کرد: {point.ColorHex}";
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
+    }
+
+    private void Infinite_Checked(object sender, RoutedEventArgs e)
+        => RepeatCountBox.IsEnabled = false;
+
+    private void Infinite_Unchecked(object sender, RoutedEventArgs e)
+        => RepeatCountBox.IsEnabled = true;
+
+    private void ShowError(Exception ex)
+    {
+        Show();
+        MessageBox.Show(ex.Message, "خطا", MessageBoxButton.OK, MessageBoxImage.Error);
+        StatusText.Text = "خطا";
+    }
+}
