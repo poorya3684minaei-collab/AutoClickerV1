@@ -25,6 +25,7 @@
                     Value="Hand"/>
         </Style>
 
+
         <Style x:Key="SmallButtonStyle"
                TargetType="Button">
             <Setter Property="Margin"
@@ -35,6 +36,7 @@
                     Value="Hand"/>
         </Style>
 
+
         <Style TargetType="TextBox">
             <Setter Property="Margin"
                     Value="4"/>
@@ -43,6 +45,7 @@
             <Setter Property="FontSize"
                     Value="14"/>
         </Style>
+
 
         <Style TargetType="GroupBox">
             <Setter Property="Margin"
@@ -122,10 +125,12 @@
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Click="AddPoint_Click"/>
 
+
                         <Button x:Name="DeletePointButton"
                                 Content="حذف نقطه"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="DeletePoint_Click"/>
+
 
                         <Button x:Name="EditColorButton"
                                 Content="به‌روزرسانی رنگ"
@@ -177,6 +182,7 @@
                                                 <Run Text="{Binding Y}"/>
 
                                             </TextBlock>
+
 
                                             <TextBlock Text="{Binding ColorHex}"
                                                        Foreground="#6B7280"
@@ -235,6 +241,8 @@
                                    Margin="5,5,5,12"/>
 
 
+                        <!-- رنگ -->
+
                         <TextBlock Text="رنگ ذخیره‌شده:"
                                    FontWeight="SemiBold"
                                    Margin="5,3"/>
@@ -253,20 +261,28 @@
                         </Border>
 
 
-                        <TextBlock Text="فاصله / تأخیر (ثانیه)"
+                        <!-- فاصله -->
+
+                        <TextBlock x:Name="DelayLabel"
+                                   Text="فاصله کلیک → کلیک بعدی (ثانیه)"
                                    FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
                                    Margin="5,15,5,3"/>
+
 
                         <TextBox x:Name="DelayBox"
                                  Text="1.0"/>
 
-                        <Button Content="اعمال تأخیر"
+
+                        <Button Content="اعمال فاصله"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="ApplyDelay_Click"/>
 
 
                         <Separator Margin="5,15"/>
 
+
+                        <!-- بررسی رنگ -->
 
                         <TextBlock Text="بررسی رنگ"
                                    FontSize="17"
@@ -278,12 +294,15 @@
                                    FontWeight="SemiBold"
                                    Margin="5,3"/>
 
+
                         <TextBox x:Name="ToleranceBox"
                                  Text="10"/>
+
 
                         <Button Content="فعال کردن بررسی رنگ"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="EnableColorCheck_Click"/>
+
 
                         <Button Content="غیرفعال کردن بررسی رنگ"
                                 Style="{StaticResource SmallButtonStyle}"
@@ -293,10 +312,13 @@
                         <Separator Margin="5,15"/>
 
 
+                        <!-- تعداد تکرار -->
+
                         <TextBlock Text="تعداد تکرار"
                                    FontSize="17"
                                    FontWeight="Bold"
                                    Margin="5,5,5,10"/>
+
 
                         <TextBox x:Name="RepeatCountBox"
                                  Text="1"/>
@@ -311,6 +333,8 @@
 
                         <Separator Margin="5,15"/>
 
+
+                        <!-- اجرا -->
 
                         <Button x:Name="StartButton"
                                 Content="▶  شروع"
