@@ -47,6 +47,7 @@ public class SequenceRunner
             return;
         }
 
+
         if (!infinite &&
             repeatCount < 1)
         {
@@ -99,9 +100,15 @@ public class SequenceRunner
                 }
 
 
-                foreach (ClickPoint point in points)
+                for (int index = 0;
+                     index < points.Count;
+                     index++)
                 {
                     token.ThrowIfCancellationRequested();
+
+
+                    ClickPoint point =
+                        points[index];
 
 
                     currentPointCallback(point);
@@ -135,6 +142,7 @@ public class SequenceRunner
                         {
                             shouldClick = false;
 
+
                             statusCallback(
                                 $"نقطه {point.Number}: " +
                                 $"رنگ مطابقت ندارد → " +
@@ -159,7 +167,36 @@ public class SequenceRunner
                     }
 
 
-                    if (point.DelayMs > 0)
+                    /*
+                     * DelayMs فاصله بین این کلیک و کلیک بعدی است.
+                     *
+                     * اگر نقطه آخر نباشد:
+                     *     فاصله تا نقطه بعدی همین دور.
+                     *
+                     * اگر نقطه آخر باشد:
+                     *     فقط وقتی صبر می‌کنیم که دور بعدی
+                     *     واقعاً قرار است اجرا شود.
+                     *
+                     * بنابراین در آخرین دورِ یک اجرای محدود،
+                     * بعد از آخرین کلیک دیگر هیچ تأخیری نداریم.
+                     */
+
+                    bool isLastPoint =
+                        index == points.Count - 1;
+
+
+                    bool anotherCycleWillStart =
+                        infinite ||
+                        loop < repeatCount;
+
+
+                    bool shouldWait =
+                        !isLastPoint ||
+                        anotherCycleWillStart;
+
+
+                    if (shouldWait &&
+                        point.DelayMs > 0)
                     {
                         await Task.Delay(
                             point.DelayMs,
@@ -180,6 +217,7 @@ public class SequenceRunner
                 }
             }
 
+
             cts.Dispose();
         }
     }
@@ -189,10 +227,12 @@ public class SequenceRunner
     {
         CancellationTokenSource? cts;
 
+
         lock (_lock)
         {
             cts = _cts;
         }
+
 
         cts?.Cancel();
     }
