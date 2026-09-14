@@ -18,21 +18,42 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+
         _mouse = new MouseService();
-        _runner = new SequenceRunner(_mouse);
-        _points = new ObservableCollection<ClickPoint>();
 
-        PointsList.ItemsSource = _points;
+        _runner =
+            new SequenceRunner(_mouse);
 
-        DelayBox.Text = "1.0";
-        ToleranceBox.Text = "10";
-        RepeatCountBox.Text = "1";
+        _points =
+            new ObservableCollection<ClickPoint>();
 
-        InfiniteCheckBox.IsChecked = false;
+
+        PointsList.ItemsSource =
+            _points;
+
+
+        DelayBox.Text =
+            "1.0";
+
+        ToleranceBox.Text =
+            "10";
+
+        RepeatCountBox.Text =
+            "1";
+
+
+        InfiniteCheckBox.IsChecked =
+            false;
+
 
         SetRunningState(false);
 
-        StatusText.Text = "آماده";
+
+        StatusText.Text =
+            "آماده";
+
+
+        RefreshEditor();
     }
 
 
@@ -43,51 +64,92 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
+
         try
         {
-            var picker = new PointPickerWindow
-            {
-                Owner = this
-            };
+            var picker =
+                new PointPickerWindow
+                {
+                    Owner = this
+                };
+
 
             Hide();
 
-            bool? result = picker.ShowDialog();
+
+            bool? result =
+                picker.ShowDialog();
+
 
             Show();
             Activate();
             Focus();
 
+
             if (result != true)
                 return;
 
-            if (picker.SelectedPoint is not System.Windows.Point selectedPoint)
+
+            if (picker.SelectedPoint
+                is not System.Windows.Point selectedPoint)
                 return;
 
-            int x = (int)Math.Round(selectedPoint.X);
-            int y = (int)Math.Round(selectedPoint.Y);
 
-            var color = _mouse.GetPixelColor(x, y);
+            int x =
+                (int)Math.Round(
+                    selectedPoint.X);
 
-            var point = new ClickPoint
-            {
-                Number = _points.Count + 1,
-                X = x,
-                Y = y,
-                DelayMs = 1000,
-                R = color.R,
-                G = color.G,
-                B = color.B,
-                Tolerance = 10,
-                CheckMode = CheckMode.None
-            };
+            int y =
+                (int)Math.Round(
+                    selectedPoint.Y);
+
+
+            var color =
+                _mouse.GetPixelColor(
+                    x,
+                    y);
+
+
+            var point =
+                new ClickPoint
+                {
+                    Number =
+                        _points.Count + 1,
+
+                    X = x,
+
+                    Y = y,
+
+                    DelayMs =
+                        1000,
+
+                    R = color.R,
+
+                    G = color.G,
+
+                    B = color.B,
+
+                    Tolerance =
+                        10,
+
+                    CheckMode =
+                        CheckMode.None
+                };
+
 
             _points.Add(point);
 
-            PointsList.SelectedItem = point;
-            PointsList.ScrollIntoView(point);
+
+            PointsList.SelectedItem =
+                point;
+
+
+            PointsList.ScrollIntoView(
+                point);
+
 
             RefreshEditor();
+
 
             StatusText.Text =
                 $"نقطه {point.Number} اضافه شد | " +
@@ -111,14 +173,24 @@ public partial class MainWindow : Window
 
     private void RefreshEditor()
     {
-        if (PointsList.SelectedItem is not ClickPoint point)
+        if (PointsList.SelectedItem
+            is not ClickPoint point)
         {
-            ColorInfoText.Text = "—";
-            DelayBox.Text = "1.0";
-            ToleranceBox.Text = "10";
+            ColorInfoText.Text =
+                "—";
+
+            DelayBox.Text =
+                "1.0";
+
+            ToleranceBox.Text =
+                "10";
+
+            DelayLabel.Text =
+                "فاصله کلیک → کلیک بعدی (ثانیه)";
 
             return;
         }
+
 
         DelayBox.Text =
             (point.DelayMs / 1000.0)
@@ -126,12 +198,50 @@ public partial class MainWindow : Window
                 "0.###",
                 CultureInfo.InvariantCulture);
 
+
         ToleranceBox.Text =
             point.Tolerance.ToString(
                 CultureInfo.InvariantCulture);
 
+
         ColorInfoText.Text =
-            $"{point.ColorHex} | ({point.X}, {point.Y})";
+            $"{point.ColorHex} | " +
+            $"({point.X}, {point.Y})";
+
+
+        int index =
+            PointsList.SelectedIndex;
+
+
+        if (index >= 0 &&
+            index < _points.Count)
+        {
+            int nextIndex =
+                index + 1;
+
+
+            if (nextIndex >= _points.Count)
+            {
+                nextIndex = 0;
+            }
+
+
+            int nextNumber =
+                _points.Count > 0
+                    ? _points[nextIndex].Number
+                    : 1;
+
+
+            DelayLabel.Text =
+                $"فاصله کلیک {point.Number} → " +
+                $"کلیک {nextNumber} (ثانیه)";
+        }
+        else
+        {
+            DelayLabel.Text =
+                $"فاصله کلیک {point.Number} → " +
+                $"کلیک بعدی (ثانیه)";
+        }
     }
 
 
@@ -142,7 +252,9 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
-        if (PointsList.SelectedItem is not ClickPoint point)
+
+        if (PointsList.SelectedItem
+            is not ClickPoint point)
         {
             MessageBox.Show(
                 "ابتدا یک نقطه را انتخاب کنید.",
@@ -153,10 +265,12 @@ public partial class MainWindow : Window
             return;
         }
 
+
         string text =
             DelayBox.Text
                 .Trim()
                 .Replace(',', '.');
+
 
         if (!double.TryParse(
                 text,
@@ -165,32 +279,36 @@ public partial class MainWindow : Window
                 out double seconds))
         {
             MessageBox.Show(
-                "تأخیر باید یک عدد معتبر باشد.",
+                "فاصله باید یک عدد معتبر باشد.",
                 "خطا",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
 
             return;
         }
+
 
         if (seconds < 0)
         {
             MessageBox.Show(
-                "تأخیر نمی‌تواند منفی باشد.",
+                "فاصله نمی‌تواند منفی باشد.",
                 "خطا",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
 
             return;
         }
+
 
         double milliseconds =
             seconds * 1000.0;
 
-        if (milliseconds > int.MaxValue)
+
+        if (milliseconds >
+            int.MaxValue)
         {
             MessageBox.Show(
-                "مقدار تأخیر بیش از حد بزرگ است.",
+                "مقدار فاصله بیش از حد بزرگ است.",
                 "خطا",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -198,15 +316,46 @@ public partial class MainWindow : Window
             return;
         }
 
+
         point.DelayMs =
-            (int)Math.Round(milliseconds);
+            (int)Math.Round(
+                milliseconds);
+
 
         PointsList.Items.Refresh();
 
+
         RefreshEditor();
 
+
+        int index =
+            PointsList.SelectedIndex;
+
+
+        int nextNumber =
+            point.Number + 1;
+
+
+        if (index >= 0 &&
+            index < _points.Count)
+        {
+            if (index + 1 <
+                _points.Count)
+            {
+                nextNumber =
+                    _points[index + 1].Number;
+            }
+            else
+            {
+                nextNumber =
+                    _points[0].Number;
+            }
+        }
+
+
         StatusText.Text =
-            $"تأخیر نقطه {point.Number} " +
+            $"فاصله کلیک {point.Number} → " +
+            $"کلیک {nextNumber} " +
             $"به {point.DelayText} تغییر کرد.";
     }
 
@@ -218,7 +367,9 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
-        if (PointsList.SelectedItem is not ClickPoint point)
+
+        if (PointsList.SelectedItem
+            is not ClickPoint point)
         {
             MessageBox.Show(
                 "ابتدا یک نقطه را انتخاب کنید.",
@@ -229,8 +380,10 @@ public partial class MainWindow : Window
             return;
         }
 
+
         string text =
             ToleranceBox.Text.Trim();
+
 
         if (!int.TryParse(
                 text,
@@ -247,7 +400,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (tolerance < 0 || tolerance > 255)
+
+        if (tolerance < 0 ||
+            tolerance > 255)
         {
             MessageBox.Show(
                 "Tolerance باید بین 0 تا 255 باشد.",
@@ -258,15 +413,24 @@ public partial class MainWindow : Window
             return;
         }
 
-        point.Tolerance = tolerance;
-        point.CheckMode = CheckMode.Color;
+
+        point.Tolerance =
+            tolerance;
+
+
+        point.CheckMode =
+            CheckMode.Color;
+
 
         PointsList.Items.Refresh();
 
+
         RefreshEditor();
 
+
         StatusText.Text =
-            $"بررسی رنگ برای نقطه {point.Number} فعال شد.";
+            $"بررسی رنگ برای نقطه " +
+            $"{point.Number} فعال شد.";
     }
 
 
@@ -277,17 +441,25 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
-        if (PointsList.SelectedItem is not ClickPoint point)
+
+        if (PointsList.SelectedItem
+            is not ClickPoint point)
             return;
 
-        point.CheckMode = CheckMode.None;
+
+        point.CheckMode =
+            CheckMode.None;
+
 
         PointsList.Items.Refresh();
 
+
         RefreshEditor();
 
+
         StatusText.Text =
-            $"بررسی رنگ برای نقطه {point.Number} غیرفعال شد.";
+            $"بررسی رنگ برای نقطه " +
+            $"{point.Number} غیرفعال شد.";
     }
 
 
@@ -297,6 +469,7 @@ public partial class MainWindow : Window
     {
         if (_runner.IsRunning)
             return;
+
 
         if (_points.Count == 0)
         {
@@ -309,10 +482,13 @@ public partial class MainWindow : Window
             return;
         }
 
+
         bool infinite =
             InfiniteCheckBox.IsChecked == true;
 
+
         int repeatCount = 1;
+
 
         if (!infinite)
         {
@@ -331,6 +507,7 @@ public partial class MainWindow : Window
                 return;
             }
 
+
             if (repeatCount < 1)
             {
                 MessageBox.Show(
@@ -343,14 +520,19 @@ public partial class MainWindow : Window
             }
         }
 
+
         try
         {
             SetRunningState(true);
 
-            StatusText.Text = "در حال اجرا...";
+
+            StatusText.Text =
+                "در حال اجرا...";
+
 
             var pointsSnapshot =
                 _points.ToList();
+
 
             await _runner.StartAsync(
                 pointsSnapshot,
@@ -360,16 +542,20 @@ public partial class MainWindow : Window
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        StatusText.Text = status;
+                        StatusText.Text =
+                            status;
                     });
                 },
                 point =>
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        PointsList.SelectedItem = point;
+                        PointsList.SelectedItem =
+                            point;
 
-                        PointsList.ScrollIntoView(point);
+
+                        PointsList.ScrollIntoView(
+                            point);
                     });
                 });
         }
@@ -386,9 +572,11 @@ public partial class MainWindow : Window
         {
             SetRunningState(false);
 
+
             if (!_runner.IsRunning)
             {
-                if (StatusText.Text == "در حال اجرا...")
+                if (StatusText.Text ==
+                    "در حال اجرا...")
                 {
                     StatusText.Text =
                         "اجرا تمام شد.";
@@ -410,8 +598,10 @@ public partial class MainWindow : Window
             return;
         }
 
+
         StatusText.Text =
             "در حال توقف...";
+
 
         _runner.Stop();
     }
@@ -424,7 +614,9 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
-        if (PointsList.SelectedItem is not ClickPoint point)
+
+        if (PointsList.SelectedItem
+            is not ClickPoint point)
         {
             MessageBox.Show(
                 "ابتدا یک نقطه را انتخاب کنید.",
@@ -435,25 +627,32 @@ public partial class MainWindow : Window
             return;
         }
 
+
         _points.Remove(point);
+
 
         for (int i = 0;
              i < _points.Count;
              i++)
         {
-            _points[i].Number = i + 1;
+            _points[i].Number =
+                i + 1;
         }
+
 
         PointsList.Items.Refresh();
 
+
         if (_points.Count > 0)
         {
-            PointsList.SelectedIndex = 0;
+            PointsList.SelectedIndex =
+                0;
         }
         else
         {
             RefreshEditor();
         }
+
 
         StatusText.Text =
             "نقطه حذف شد.";
@@ -467,7 +666,9 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
-        if (PointsList.SelectedItem is not ClickPoint point)
+
+        if (PointsList.SelectedItem
+            is not ClickPoint point)
         {
             MessageBox.Show(
                 "ابتدا یک نقطه را انتخاب کنید.",
@@ -478,6 +679,7 @@ public partial class MainWindow : Window
             return;
         }
 
+
         try
         {
             var color =
@@ -485,13 +687,22 @@ public partial class MainWindow : Window
                     point.X,
                     point.Y);
 
-            point.R = color.R;
-            point.G = color.G;
-            point.B = color.B;
+
+            point.R =
+                color.R;
+
+            point.G =
+                color.G;
+
+            point.B =
+                color.B;
+
 
             PointsList.Items.Refresh();
 
+
             RefreshEditor();
+
 
             StatusText.Text =
                 $"رنگ نقطه {point.Number} " +
@@ -512,7 +723,9 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
-        RepeatCountBox.IsEnabled = false;
+
+        RepeatCountBox.IsEnabled =
+            false;
     }
 
 
@@ -523,7 +736,9 @@ public partial class MainWindow : Window
         if (_runner.IsRunning)
             return;
 
-        RepeatCountBox.IsEnabled = true;
+
+        RepeatCountBox.IsEnabled =
+            true;
     }
 
 
@@ -533,26 +748,34 @@ public partial class MainWindow : Window
         AddPointButton.IsEnabled =
             !running;
 
+
         DeletePointButton.IsEnabled =
             !running;
+
 
         EditColorButton.IsEnabled =
             !running;
 
+
         StartButton.IsEnabled =
             !running;
+
 
         StopButton.IsEnabled =
             running;
 
+
         DelayBox.IsEnabled =
             !running;
+
 
         ToleranceBox.IsEnabled =
             !running;
 
+
         InfiniteCheckBox.IsEnabled =
             !running;
+
 
         RepeatCountBox.IsEnabled =
             !running &&
@@ -560,15 +783,18 @@ public partial class MainWindow : Window
     }
 
 
-    private void ShowError(Exception ex)
+    private void ShowError(
+        Exception ex)
     {
         Show();
+
 
         MessageBox.Show(
             ex.Message,
             "خطا",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
+
 
         StatusText.Text =
             "خطا";
