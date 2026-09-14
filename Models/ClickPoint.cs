@@ -14,8 +14,8 @@ public class ClickPoint
 
     public int Y { get; set; }
 
-    // فاصله زمانی از این نقطه تا نقطه بعدی.
-    // برای آخرین نقطه، فاصله زمانی تا نقطه اولِ دور بعدی است.
+    // فاصله زمانی بین کلیک این نقطه و کلیک نقطه بعدی.
+    // برای آخرین نقطه: فاصله آخرین نقطه تا نقطه اول.
     public int DelayMs { get; set; } = 1000;
 
     // رنگ اختصاصی همین نقطه
@@ -25,20 +25,18 @@ public class ClickPoint
 
     public byte B { get; set; }
 
-    // میزان اختلاف مجاز هر کانال رنگی
+    // اختلاف مجاز هر کانال رنگ
     // 0 = کاملاً دقیق
     // 255 = بسیار آزاد
-    public int Tolerance { get; set; } = 10;
+    public int Tolerance { get; set; } = 20;
 
-    // آیا بررسی رنگ برای این نقطه فعال است؟
+    // فعال یا غیرفعال بودن بررسی رنگ
     public CheckMode CheckMode { get; set; } = CheckMode.None;
 
-    // شعاع محدوده‌ای که اطراف نقطه برای پیدا کردن رنگ بررسی می‌شود.
-    // مقدار 12 یعنی محدوده 25×25 پیکسل.
-    public int SearchRadius { get; set; } = 12;
+    // شعاع جست‌وجوی رنگ اطراف نقطه
+    public int SearchRadius { get; set; } = 15;
 
-    // حداقل درصد پیکسل‌های منطبق برای قبول کردن رنگ.
-    // مثلاً 5 یعنی حداقل 5 درصد محدوده باید با رنگ موردنظر منطبق باشد.
+    // حداقل درصد پیکسل‌های مشابه
     public int MinimumMatchPercent { get; set; } = 5;
 
     public string ColorHex =>
