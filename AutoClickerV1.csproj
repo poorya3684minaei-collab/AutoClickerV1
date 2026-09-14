@@ -2,16 +2,37 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+
+    <!-- Windows 7 SP1 / 8.1 / 10 / 11 -->
+    <TargetFramework>net48</TargetFramework>
+
     <UseWPF>true</UseWPF>
+
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- اجازه استفاده از قابلیت‌های جدید زبان C# -->
+    <LangVersion>latest</LangVersion>
+
     <AssemblyName>AutoClickerV1</AssemblyName>
     <RootNamespace>AutoClickerV1</RootNamespace>
+
+    <!-- خروجی مستقل برای 32 و 64 بیت -->
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+
+    <!--
+      Reference Assemblies مربوط به .NET Framework 4.8
+      باعث می‌شود GitHub Actions بدون نیاز به نصب Developer Pack
+      بتواند پروژه را Build کند.
+    -->
+    <PackageReference
+      Include="Microsoft.NETFramework.ReferenceAssemblies"
+      Version="1.0.3"
+      PrivateAssets="All" />
+
   </ItemGroup>
 
 </Project>
