@@ -11,7 +11,6 @@ public class SequenceRunner
     private readonly object _lock =
         new();
 
-
     public bool IsRunning
     {
         get
@@ -23,13 +22,11 @@ public class SequenceRunner
         }
     }
 
-
     public SequenceRunner(
         MouseService mouse)
     {
         _mouse = mouse;
     }
-
 
     public async Task StartAsync(
         List<ClickPoint> points,
@@ -47,7 +44,6 @@ public class SequenceRunner
             return;
         }
 
-
         if (!infinite &&
             repeatCount < 1)
         {
@@ -55,7 +51,6 @@ public class SequenceRunner
                 nameof(repeatCount),
                 "تعداد تکرار باید حداقل 1 باشد.");
         }
-
 
         CancellationTokenSource cts;
 
@@ -70,23 +65,20 @@ public class SequenceRunner
             cts = _cts;
         }
 
-
         CancellationToken token =
             cts.Token;
-
 
         try
         {
             int loop = 0;
 
-
-            while (infinite ||
-                   loop < repeatCount)
+            while (
+                infinite ||
+                loop < repeatCount)
             {
                 token.ThrowIfCancellationRequested();
 
                 loop++;
-
 
                 if (infinite)
                 {
@@ -99,103 +91,103 @@ public class SequenceRunner
                         $"دور {loop} از {repeatCount}");
                 }
 
-
-                for (int index = 0;
-                     index < points.Count;
-                     index++)
+                for (
+                    int index = 0;
+                    index < points.Count;
+                    index++)
                 {
                     token.ThrowIfCancellationRequested();
-
 
                     ClickPoint point =
                         points[index];
 
-
                     currentPointCallback(point);
-
 
                     statusCallback(
                         $"بررسی نقطه {point.Number} | " +
                         $"({point.X}, {point.Y})");
 
-
                     bool shouldClick = true;
 
-
-                    if (point.CheckMode ==
+                    if (
+                        point.CheckMode ==
                         CheckMode.Color)
                     {
                         bool colorMatches =
-                            _mouse.IsColorMatch(
+                            _mouse.IsColorMatchInRegion(
                                 point.X,
                                 point.Y,
                                 point.R,
                                 point.G,
                                 point.B,
-                                point.Tolerance);
-
+                                point.Tolerance,
+                                point.SearchRadius,
+                                point.MinimumMatchPercent);
 
                         token.ThrowIfCancellationRequested();
-
 
                         if (!colorMatches)
                         {
                             shouldClick = false;
 
-
                             statusCallback(
                                 $"نقطه {point.Number}: " +
-                                $"رنگ مطابقت ندارد → " +
-                                $"کلیک رد شد.");
+                                $"رنگ در محدوده پیدا نشد " +
+                                $"→ کلیک رد شد.");
+                        }
+                        else
+                        {
+                            statusCallback(
+                                $"نقطه {point.Number}: " +
+                                $"رنگ تأیید شد.");
                         }
                     }
-
 
                     if (shouldClick)
                     {
                         token.ThrowIfCancellationRequested();
 
-
                         statusCallback(
                             $"کلیک روی نقطه {point.Number} → " +
                             $"({point.X}, {point.Y})");
-
 
                         _mouse.Click(
                             point.X,
                             point.Y);
                     }
 
-
                     /*
-                     * DelayMs فاصله بین این کلیک و کلیک بعدی است.
+                     * DelayMs فاصله بین این نقطه و نقطه بعدی است.
                      *
-                     * اگر نقطه آخر نباشد:
-                     *     فاصله تا نقطه بعدی همین دور.
+                     * نقطه 1:
+                     *     DelayMs = فاصله 1 → 2
                      *
-                     * اگر نقطه آخر باشد:
-                     *     فقط وقتی صبر می‌کنیم که دور بعدی
-                     *     واقعاً قرار است اجرا شود.
+                     * نقطه 2:
+                     *     DelayMs = فاصله 2 → 3
                      *
-                     * بنابراین در آخرین دورِ یک اجرای محدود،
-                     * بعد از آخرین کلیک دیگر هیچ تأخیری نداریم.
+                     * ...
+                     *
+                     * نقطه آخر:
+                     *     DelayMs = فاصله آخر → 1
+                     *
+                     * در اجرای محدود، بعد از آخرین کلیک
+                     * آخرین دور دیگر منتظر نمی‌مانیم.
                      */
 
                     bool isLastPoint =
-                        index == points.Count - 1;
-
+                        index ==
+                        points.Count - 1;
 
                     bool anotherCycleWillStart =
                         infinite ||
                         loop < repeatCount;
 
-
                     bool shouldWait =
                         !isLastPoint ||
                         anotherCycleWillStart;
 
-
-                    if (shouldWait &&
+                    if (
+                        shouldWait &&
                         point.DelayMs > 0)
                     {
                         await Task.Delay(
@@ -209,7 +201,8 @@ public class SequenceRunner
         {
             lock (_lock)
             {
-                if (ReferenceEquals(
+                if (
+                    ReferenceEquals(
                         _cts,
                         cts))
                 {
@@ -217,22 +210,18 @@ public class SequenceRunner
                 }
             }
 
-
             cts.Dispose();
         }
     }
-
 
     public void Stop()
     {
         CancellationTokenSource? cts;
 
-
         lock (_lock)
         {
             cts = _cts;
         }
-
 
         cts?.Cancel();
     }
