@@ -8,17 +8,24 @@ public class SequenceRunner
 
     private CancellationTokenSource? _cts;
 
+    private readonly object _lock =
+        new();
+
+
     public bool IsRunning
     {
         get
         {
-            return _cts != null &&
-                   !_cts.IsCancellationRequested;
+            lock (_lock)
+            {
+                return _cts != null;
+            }
         }
     }
 
 
-    public SequenceRunner(MouseService mouse)
+    public SequenceRunner(
+        MouseService mouse)
     {
         _mouse = mouse;
     }
@@ -31,37 +38,54 @@ public class SequenceRunner
         Action<string> statusCallback,
         Action<ClickPoint> currentPointCallback)
     {
-        if (points == null || points.Count == 0)
+        if (points == null ||
+            points.Count == 0)
         {
-            statusCallback("هیچ نقطه‌ای وجود ندارد.");
+            statusCallback(
+                "هیچ نقطه‌ای وجود ندارد.");
+
             return;
         }
 
-        if (!infinite && repeatCount < 1)
+        if (!infinite &&
+            repeatCount < 1)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(repeatCount),
                 "تعداد تکرار باید حداقل 1 باشد.");
         }
 
-        if (IsRunning)
+
+        CancellationTokenSource cts;
+
+        lock (_lock)
         {
-            return;
+            if (_cts != null)
+                return;
+
+            _cts =
+                new CancellationTokenSource();
+
+            cts = _cts;
         }
 
-        _cts = new CancellationTokenSource();
 
-        CancellationToken token = _cts.Token;
+        CancellationToken token =
+            cts.Token;
+
 
         try
         {
             int loop = 0;
 
-            while (infinite || loop < repeatCount)
+
+            while (infinite ||
+                   loop < repeatCount)
             {
                 token.ThrowIfCancellationRequested();
 
                 loop++;
+
 
                 if (infinite)
                 {
@@ -79,16 +103,20 @@ public class SequenceRunner
                 {
                     token.ThrowIfCancellationRequested();
 
+
                     currentPointCallback(point);
 
+
                     statusCallback(
-                        $"بررسی نقطه {point.Number} | ({point.X}, {point.Y})");
+                        $"بررسی نقطه {point.Number} | " +
+                        $"({point.X}, {point.Y})");
 
 
                     bool shouldClick = true;
 
 
-                    if (point.CheckMode == CheckMode.Color)
+                    if (point.CheckMode ==
+                        CheckMode.Color)
                     {
                         bool colorMatches =
                             _mouse.IsColorMatch(
@@ -99,20 +127,31 @@ public class SequenceRunner
                                 point.B,
                                 point.Tolerance);
 
+
+                        token.ThrowIfCancellationRequested();
+
+
                         if (!colorMatches)
                         {
                             shouldClick = false;
 
                             statusCallback(
-                                $"نقطه {point.Number}: رنگ مطابقت ندارد → کلیک رد شد.");
+                                $"نقطه {point.Number}: " +
+                                $"رنگ مطابقت ندارد → " +
+                                $"کلیک رد شد.");
                         }
                     }
 
 
                     if (shouldClick)
                     {
+                        token.ThrowIfCancellationRequested();
+
+
                         statusCallback(
-                            $"کلیک روی نقطه {point.Number} → ({point.X}, {point.Y})");
+                            $"کلیک روی نقطه {point.Number} → " +
+                            $"({point.X}, {point.Y})");
+
 
                         _mouse.Click(
                             point.X,
@@ -131,14 +170,30 @@ public class SequenceRunner
         }
         finally
         {
-            _cts.Dispose();
-            _cts = null;
+            lock (_lock)
+            {
+                if (ReferenceEquals(
+                        _cts,
+                        cts))
+                {
+                    _cts = null;
+                }
+            }
+
+            cts.Dispose();
         }
     }
 
 
     public void Stop()
     {
-        _cts?.Cancel();
+        CancellationTokenSource? cts;
+
+        lock (_lock)
+        {
+            cts = _cts;
+        }
+
+        cts?.Cancel();
     }
 }
