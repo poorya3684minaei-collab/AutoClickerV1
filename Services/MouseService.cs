@@ -52,7 +52,6 @@ public class MouseService
         INPUT[] pInputs,
         int cbSize);
 
-
     public void MoveTo(int x, int y)
     {
         if (!SetCursorPos(x, y))
@@ -61,7 +60,6 @@ public class MouseService
                 "امکان جابه‌جایی نشانگر ماوس وجود ندارد.");
         }
     }
-
 
     public void Click(int x, int y)
     {
@@ -115,7 +113,6 @@ public class MouseService
         }
     }
 
-
     public Color GetPixelColor(int x, int y)
     {
         using var bitmap = new Bitmap(1, 1);
@@ -133,7 +130,124 @@ public class MouseService
         return bitmap.GetPixel(0, 0);
     }
 
+    /// <summary>
+    /// بررسی می‌کند آیا رنگ موردنظر در محدوده اطراف نقطه
+    /// به اندازه کافی وجود دارد یا خیر.
+    ///
+    /// به جای بررسی فقط یک پیکسل، کل محدوده بررسی می‌شود.
+    /// </summary>
+    public bool IsColorMatchInRegion(
+        int x,
+        int y,
+        byte r,
+        byte g,
+        byte b,
+        int tolerance,
+        int searchRadius,
+        int minimumMatchPercent)
+    {
+        if (tolerance < 0)
+            tolerance = 0;
 
+        if (tolerance > 255)
+            tolerance = 255;
+
+        if (searchRadius < 1)
+            searchRadius = 1;
+
+        if (searchRadius > 100)
+            searchRadius = 100;
+
+        if (minimumMatchPercent < 0)
+            minimumMatchPercent = 0;
+
+        if (minimumMatchPercent > 100)
+            minimumMatchPercent = 100;
+
+        int size =
+            (searchRadius * 2) + 1;
+
+        int left =
+            x - searchRadius;
+
+        int top =
+            y - searchRadius;
+
+        int matchingPixels = 0;
+
+        int totalPixels = 0;
+
+        using var bitmap =
+            new Bitmap(
+                size,
+                size);
+
+        using var graphics =
+            Graphics.FromImage(bitmap);
+
+        try
+        {
+            graphics.CopyFromScreen(
+                left,
+                top,
+                0,
+                0,
+                new System.Drawing.Size(
+                    size,
+                    size));
+
+            for (int py = 0;
+                 py < size;
+                 py++)
+            {
+                for (int px = 0;
+                     px < size;
+                     px++)
+                {
+                    Color current =
+                        bitmap.GetPixel(
+                            px,
+                            py);
+
+                    totalPixels++;
+
+                    if (
+                        Math.Abs(
+                            current.R - r) <= tolerance
+                        &&
+                        Math.Abs(
+                            current.G - g) <= tolerance
+                        &&
+                        Math.Abs(
+                            current.B - b) <= tolerance)
+                    {
+                        matchingPixels++;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // اگر محدوده در لبه صفحه یا شرایط خاصی
+            // قابل خواندن نبود، رنگ را نامعتبر در نظر می‌گیریم.
+            return false;
+        }
+
+        if (totalPixels == 0)
+            return false;
+
+        double matchPercent =
+            (matchingPixels * 100.0) /
+            totalPixels;
+
+        return matchPercent >=
+               minimumMatchPercent;
+    }
+
+    /// <summary>
+    /// نسخه قدیمی برای سازگاری با کدهای احتمالی دیگر پروژه.
+    /// فقط همان یک پیکسل را بررسی می‌کند.
+    /// </summary>
     public bool IsColorMatch(
         int x,
         int y,
