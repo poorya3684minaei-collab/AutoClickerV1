@@ -53,6 +53,7 @@
 
     </Window.Resources>
 
+
     <Grid Margin="12">
 
         <Grid.RowDefinitions>
@@ -61,7 +62,9 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+
         <!-- عنوان -->
+
         <Border Grid.Row="0"
                 Background="#1F2937"
                 CornerRadius="8"
@@ -69,6 +72,7 @@
                 Margin="0,0,0,10">
 
             <StackPanel>
+
                 <TextBlock Text="Auto Clicker V1"
                            Foreground="White"
                            FontSize="25"
@@ -78,12 +82,14 @@
                            Foreground="#D1D5DB"
                            FontSize="13"
                            Margin="0,4,0,0"/>
+
             </StackPanel>
 
         </Border>
 
 
         <!-- محتوای اصلی -->
+
         <Grid Grid.Row="1">
 
             <Grid.ColumnDefinitions>
@@ -93,6 +99,7 @@
 
 
             <!-- لیست نقاط -->
+
             <GroupBox Grid.Column="0"
                       Header="نقاط کلیک">
 
@@ -105,26 +112,31 @@
                     </Grid.RowDefinitions>
 
 
-                    <!-- دکمه های نقاط -->
+                    <!-- دکمه‌های نقاط -->
+
                     <WrapPanel Grid.Row="0"
                                Margin="0,0,0,8">
 
-                        <Button Content="＋ افزودن نقطه"
+                        <Button x:Name="AddPointButton"
+                                Content="＋ افزودن نقطه"
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Click="AddPoint_Click"/>
 
-                        <Button Content="حذف نقطه"
+                        <Button x:Name="DeletePointButton"
+                                Content="حذف نقطه"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="DeletePoint_Click"/>
 
-                        <Button Content="به‌روزرسانی رنگ"
+                        <Button x:Name="EditColorButton"
+                                Content="به‌روزرسانی رنگ"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="EditColor_Click"/>
 
                     </WrapPanel>
 
 
-                    <!-- لیست -->
+                    <!-- لیست نقاط -->
+
                     <ListBox x:Name="PointsList"
                              Grid.Row="1"
                              SelectionChanged="PointsList_SelectionChanged"
@@ -148,18 +160,22 @@
                                             <ColumnDefinition Width="90"/>
                                         </Grid.ColumnDefinitions>
 
+
                                         <TextBlock Grid.Column="0"
                                                    Text="{Binding Number, StringFormat=№ {0}}"
                                                    FontWeight="Bold"
                                                    VerticalAlignment="Center"/>
 
+
                                         <StackPanel Grid.Column="1">
 
                                             <TextBlock FontWeight="SemiBold">
+
                                                 <Run Text="مختصات: "/>
                                                 <Run Text="{Binding X}"/>
                                                 <Run Text=", "/>
                                                 <Run Text="{Binding Y}"/>
+
                                             </TextBlock>
 
                                             <TextBlock Text="{Binding ColorHex}"
@@ -168,10 +184,12 @@
 
                                         </StackPanel>
 
+
                                         <TextBlock Grid.Column="2"
                                                    Text="{Binding DelayText}"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Center"/>
+
 
                                         <TextBlock Grid.Column="3"
                                                    Text="{Binding CheckMode}"
@@ -190,8 +208,9 @@
 
 
                     <!-- راهنما -->
+
                     <TextBlock Grid.Row="2"
-                               Text="برای افزودن نقطه، ابتدا روی «افزودن نقطه» بزنید و سپس محل موردنظر را روی صفحه انتخاب کنید."
+                               Text="برای افزودن نقطه، روی «افزودن نقطه» بزنید و سپس محل موردنظر را روی صفحه انتخاب کنید."
                                Foreground="#6B7280"
                                TextWrapping="Wrap"
                                Margin="5,10,5,3"/>
@@ -201,7 +220,8 @@
             </GroupBox>
 
 
-            <!-- پنل تنظیمات -->
+            <!-- تنظیمات -->
+
             <GroupBox Grid.Column="1"
                       Header="تنظیمات نقطه">
 
@@ -218,6 +238,7 @@
                         <TextBlock Text="رنگ ذخیره‌شده:"
                                    FontWeight="SemiBold"
                                    Margin="5,3"/>
+
 
                         <Border Background="#E5E7EB"
                                 CornerRadius="5"
@@ -252,6 +273,7 @@
                                    FontWeight="Bold"
                                    Margin="5,5,5,10"/>
 
+
                         <TextBlock Text="Tolerance"
                                    FontWeight="SemiBold"
                                    Margin="5,3"/>
@@ -279,6 +301,7 @@
                         <TextBox x:Name="RepeatCountBox"
                                  Text="1"/>
 
+
                         <CheckBox x:Name="InfiniteCheckBox"
                                   Content="تکرار نامحدود"
                                   Margin="5,8"
@@ -289,14 +312,17 @@
                         <Separator Margin="5,15"/>
 
 
-                        <Button Content="▶  شروع"
+                        <Button x:Name="StartButton"
+                                Content="▶  شروع"
                                 FontSize="16"
                                 FontWeight="Bold"
                                 Padding="10"
                                 Margin="4"
                                 Click="Start_Click"/>
 
-                        <Button Content="■  توقف"
+
+                        <Button x:Name="StopButton"
+                                Content="■  توقف"
                                 FontSize="16"
                                 FontWeight="Bold"
                                 Padding="10"
@@ -313,6 +339,7 @@
 
 
         <!-- وضعیت -->
+
         <Border Grid.Row="2"
                 Background="#E5E7EB"
                 CornerRadius="6"
