@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     private readonly SequenceRunner _runner;
     private readonly ObservableCollection<ClickPoint> _points;
 
+
     public MainWindow()
     {
         InitializeComponent();
@@ -23,17 +24,25 @@ public partial class MainWindow : Window
 
         PointsList.ItemsSource = _points;
 
-        RepeatCountBox.Text = "1";
         DelayBox.Text = "1.0";
         ToleranceBox.Text = "10";
-        RepeatCountBox.IsEnabled = true;
+        RepeatCountBox.Text = "1";
+
+        InfiniteCheckBox.IsChecked = false;
+
+        SetRunningState(false);
 
         StatusText.Text = "آماده";
     }
 
 
-    private void AddPoint_Click(object sender, RoutedEventArgs e)
+    private void AddPoint_Click(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         try
         {
             var picker = new PointPickerWindow
@@ -81,7 +90,9 @@ public partial class MainWindow : Window
             RefreshEditor();
 
             StatusText.Text =
-                $"نقطه {point.Number} اضافه شد | مختصات: ({point.X}, {point.Y}) | رنگ: {point.ColorHex}";
+                $"نقطه {point.Number} اضافه شد | " +
+                $"مختصات: ({point.X}, {point.Y}) | " +
+                $"رنگ: {point.ColorHex}";
         }
         catch (Exception ex)
         {
@@ -105,23 +116,32 @@ public partial class MainWindow : Window
             ColorInfoText.Text = "—";
             DelayBox.Text = "1.0";
             ToleranceBox.Text = "10";
+
             return;
         }
 
         DelayBox.Text =
             (point.DelayMs / 1000.0)
-            .ToString("0.###", CultureInfo.InvariantCulture);
+            .ToString(
+                "0.###",
+                CultureInfo.InvariantCulture);
 
         ToleranceBox.Text =
-            point.Tolerance.ToString(CultureInfo.InvariantCulture);
+            point.Tolerance.ToString(
+                CultureInfo.InvariantCulture);
 
         ColorInfoText.Text =
             $"{point.ColorHex} | ({point.X}, {point.Y})";
     }
 
 
-    private void ApplyDelay_Click(object sender, RoutedEventArgs e)
+    private void ApplyDelay_Click(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         if (PointsList.SelectedItem is not ClickPoint point)
         {
             MessageBox.Show(
@@ -133,7 +153,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        string text = DelayBox.Text.Trim().Replace(',', '.');
+        string text =
+            DelayBox.Text
+                .Trim()
+                .Replace(',', '.');
 
         if (!double.TryParse(
                 text,
@@ -161,7 +184,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        double milliseconds = seconds * 1000.0;
+        double milliseconds =
+            seconds * 1000.0;
 
         if (milliseconds > int.MaxValue)
         {
@@ -174,18 +198,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        point.DelayMs = (int)Math.Round(milliseconds);
+        point.DelayMs =
+            (int)Math.Round(milliseconds);
 
         PointsList.Items.Refresh();
+
         RefreshEditor();
 
         StatusText.Text =
-            $"تأخیر نقطه {point.Number} به {point.DelayText} تغییر کرد.";
+            $"تأخیر نقطه {point.Number} " +
+            $"به {point.DelayText} تغییر کرد.";
     }
 
 
-    private void EnableColorCheck_Click(object sender, RoutedEventArgs e)
+    private void EnableColorCheck_Click(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         if (PointsList.SelectedItem is not ClickPoint point)
         {
             MessageBox.Show(
@@ -197,8 +229,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        string text =
+            ToleranceBox.Text.Trim();
+
         if (!int.TryParse(
-                ToleranceBox.Text.Trim(),
+                text,
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
                 out int tolerance))
@@ -227,6 +262,7 @@ public partial class MainWindow : Window
         point.CheckMode = CheckMode.Color;
 
         PointsList.Items.Refresh();
+
         RefreshEditor();
 
         StatusText.Text =
@@ -234,14 +270,20 @@ public partial class MainWindow : Window
     }
 
 
-    private void DisableColorCheck_Click(object sender, RoutedEventArgs e)
+    private void DisableColorCheck_Click(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         if (PointsList.SelectedItem is not ClickPoint point)
             return;
 
         point.CheckMode = CheckMode.None;
 
         PointsList.Items.Refresh();
+
         RefreshEditor();
 
         StatusText.Text =
@@ -249,7 +291,9 @@ public partial class MainWindow : Window
     }
 
 
-    private async void Start_Click(object sender, RoutedEventArgs e)
+    private async void Start_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         if (_runner.IsRunning)
             return;
@@ -305,7 +349,8 @@ public partial class MainWindow : Window
 
             StatusText.Text = "در حال اجرا...";
 
-            var pointsSnapshot = _points.ToList();
+            var pointsSnapshot =
+                _points.ToList();
 
             await _runner.StartAsync(
                 pointsSnapshot,
@@ -323,15 +368,15 @@ public partial class MainWindow : Window
                     Dispatcher.Invoke(() =>
                     {
                         PointsList.SelectedItem = point;
+
                         PointsList.ScrollIntoView(point);
                     });
                 });
-
-            StatusText.Text = "اجرا تمام شد.";
         }
         catch (OperationCanceledException)
         {
-            StatusText.Text = "اجرا متوقف شد.";
+            StatusText.Text =
+                "اجرا متوقف شد.";
         }
         catch (Exception ex)
         {
@@ -340,26 +385,45 @@ public partial class MainWindow : Window
         finally
         {
             SetRunningState(false);
+
+            if (!_runner.IsRunning)
+            {
+                if (StatusText.Text == "در حال اجرا...")
+                {
+                    StatusText.Text =
+                        "اجرا تمام شد.";
+                }
+            }
         }
     }
 
 
-    private void Stop_Click(object sender, RoutedEventArgs e)
+    private void Stop_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         if (!_runner.IsRunning)
         {
-            StatusText.Text = "برنامه در حال اجرا نیست.";
+            StatusText.Text =
+                "برنامه در حال اجرا نیست.";
+
             return;
         }
 
-        _runner.Stop();
+        StatusText.Text =
+            "در حال توقف...";
 
-        StatusText.Text = "در حال توقف...";
+        _runner.Stop();
     }
 
 
-    private void DeletePoint_Click(object sender, RoutedEventArgs e)
+    private void DeletePoint_Click(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         if (PointsList.SelectedItem is not ClickPoint point)
         {
             MessageBox.Show(
@@ -371,20 +435,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_runner.IsRunning)
-        {
-            MessageBox.Show(
-                "هنگام اجرا نمی‌توان نقطه را حذف کرد.",
-                "توجه",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-
-            return;
-        }
-
         _points.Remove(point);
 
-        for (int i = 0; i < _points.Count; i++)
+        for (int i = 0;
+             i < _points.Count;
+             i++)
         {
             _points[i].Number = i + 1;
         }
@@ -400,12 +455,18 @@ public partial class MainWindow : Window
             RefreshEditor();
         }
 
-        StatusText.Text = "نقطه حذف شد.";
+        StatusText.Text =
+            "نقطه حذف شد.";
     }
 
 
-    private void EditColor_Click(object sender, RoutedEventArgs e)
+    private void EditColor_Click(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         if (PointsList.SelectedItem is not ClickPoint point)
         {
             MessageBox.Show(
@@ -419,19 +480,23 @@ public partial class MainWindow : Window
 
         try
         {
-            var color = _mouse.GetPixelColor(
-                point.X,
-                point.Y);
+            var color =
+                _mouse.GetPixelColor(
+                    point.X,
+                    point.Y);
 
             point.R = color.R;
             point.G = color.G;
             point.B = color.B;
 
             PointsList.Items.Refresh();
+
             RefreshEditor();
 
             StatusText.Text =
-                $"رنگ نقطه {point.Number} به رنگ فعلی صفحه تغییر کرد: {point.ColorHex}";
+                $"رنگ نقطه {point.Number} " +
+                $"به رنگ فعلی صفحه تغییر کرد: " +
+                $"{point.ColorHex}";
         }
         catch (Exception ex)
         {
@@ -440,83 +505,58 @@ public partial class MainWindow : Window
     }
 
 
-    private void Infinite_Checked(object sender, RoutedEventArgs e)
+    private void Infinite_Checked(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         RepeatCountBox.IsEnabled = false;
     }
 
 
-    private void Infinite_Unchecked(object sender, RoutedEventArgs e)
+    private void Infinite_Unchecked(
+        object sender,
+        RoutedEventArgs e)
     {
+        if (_runner.IsRunning)
+            return;
+
         RepeatCountBox.IsEnabled = true;
     }
 
 
-    private void SetRunningState(bool running)
+    private void SetRunningState(
+        bool running)
     {
-        AddPointButtonState(running);
+        AddPointButton.IsEnabled =
+            !running;
 
-        DeletePointButtonState(running);
+        DeletePointButton.IsEnabled =
+            !running;
+
+        EditColorButton.IsEnabled =
+            !running;
+
+        StartButton.IsEnabled =
+            !running;
+
+        StopButton.IsEnabled =
+            running;
+
+        DelayBox.IsEnabled =
+            !running;
+
+        ToleranceBox.IsEnabled =
+            !running;
+
+        InfiniteCheckBox.IsEnabled =
+            !running;
 
         RepeatCountBox.IsEnabled =
             !running &&
             InfiniteCheckBox.IsChecked != true;
-
-        InfiniteCheckBox.IsEnabled = !running;
-    }
-
-
-    private void AddPointButtonState(bool running)
-    {
-        foreach (var child in FindVisualChildren<Button>(this))
-        {
-            if (child.Content is string text &&
-                text.Contains("افزودن نقطه"))
-            {
-                child.IsEnabled = !running;
-            }
-        }
-    }
-
-
-    private void DeletePointButtonState(bool running)
-    {
-        foreach (var child in FindVisualChildren<Button>(this))
-        {
-            if (child.Content is string text &&
-                text.Contains("حذف نقطه"))
-            {
-                child.IsEnabled = !running;
-            }
-        }
-    }
-
-
-    private static IEnumerable<T> FindVisualChildren<T>(
-        DependencyObject dependencyObject)
-        where T : DependencyObject
-    {
-        if (dependencyObject == null)
-            yield break;
-
-        for (int i = 0;
-             i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(dependencyObject);
-             i++)
-        {
-            var child =
-                System.Windows.Media.VisualTreeHelper.GetChild(
-                    dependencyObject,
-                    i);
-
-            if (child is T typedChild)
-                yield return typedChild;
-
-            foreach (var descendant in
-                     FindVisualChildren<T>(child))
-            {
-                yield return descendant;
-            }
-        }
     }
 
 
@@ -530,6 +570,7 @@ public partial class MainWindow : Window
             MessageBoxButton.OK,
             MessageBoxImage.Error);
 
-        StatusText.Text = "خطا";
+        StatusText.Text =
+            "خطا";
     }
 }
