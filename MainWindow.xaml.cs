@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Interop;
 
 namespace AutoClickerV1;
 
@@ -16,160 +15,233 @@ public partial class MainWindow : Window
     private readonly SequenceRunner _runner;
     private readonly ObservableCollection<ClickPoint> _points;
 
-    // ==============================
-    // Global F7 Stop Hotkey
-    // ==============================
+    // ============================================================
+    // Global F7 stop
+    //
+    // F7 is handled with a low-level keyboard hook instead of
+    // RegisterHotKey. This keeps the stop key global and avoids
+    // depending on a registered window hotkey.
+    // ============================================================
 
-    private const int WM_HOTKEY = 0x0312;
-    private const uint MOD_NOREPEAT = 0x4000;
-    private const uint VK_F7 = 0x76;
-    private const int HOTKEY_ID_STOP = 1001;
+    private const int WH_KEYBOARD_LL = 13;
+    private const int WM_KEYDOWN = 0x0100;
+    private const int WM_SYSKEYDOWN = 0x0104;
+    private const int VK_F7 = 0x76;
 
-    private HwndSource? _hwndSource;
-    private bool _hotkeyRegistered;
+    private LowLevelKeyboardProc? _keyboardHookProc;
+    private IntPtr _keyboardHookHandle = IntPtr.Zero;
+
+    private delegate IntPtr LowLevelKeyboardProc(
+        int nCode,
+        IntPtr wParam,
+        IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool RegisterHotKey(
-        IntPtr hWnd,
-        int id,
-        uint fsModifiers,
-        uint vk);
+    private static extern IntPtr SetWindowsHookEx(
+        int idHook,
+        LowLevelKeyboardProc lpfn,
+        IntPtr hMod,
+        uint dwThreadId);
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool UnregisterHotKey(
-        IntPtr hWnd,
-        int id);
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnhookWindowsHookEx(
+        IntPtr hhk);
 
-    // ==============================
+    [DllImport("user32.dll")]
+    private static extern IntPtr CallNextHookEx(
+        IntPtr hhk,
+        int nCode,
+        IntPtr wParam,
+        IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr GetModuleHandle(
+        string? lpModuleName);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KBDLLHOOKSTRUCT
+    {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public UIntPtr dwExtraInfo;
+    }
+
+    // ============================================================
     // Constructor
-    // ==============================
+    // ============================================================
 
     public MainWindow()
     {
         InitializeComponent();
 
-        _mouse = new MouseService();
-        _runner = new SequenceRunner(_mouse);
-        _points = new ObservableCollection<ClickPoint>();
+        // Main services.
+        _mouse =
+            new MouseService();
 
-        PointsList.ItemsSource = _points;
+        _runner =
+            new SequenceRunner(_mouse);
 
-        DelayBox.Text = "1.0";
-        ToleranceBox.Text = "20";
-        SearchRadiusBox.Text = "15";
-        MinimumMatchPercentBox.Text = "5";
-        RepeatCountBox.Text = "1";
+        _points =
+            new ObservableCollection<ClickPoint>();
 
-        InfiniteCheckBox.IsChecked = false;
+        // Bind the point collection to the list.
+        PointsList.ItemsSource =
+            _points;
 
+        // Default editor values.
+        DelayBox.Text =
+            "1.0";
+
+        ToleranceBox.Text =
+            "20";
+
+        SearchRadiusBox.Text =
+            "15";
+
+        MinimumMatchPercentBox.Text =
+            "5";
+
+        RepeatCountBox.Text =
+            "1";
+
+        InfiniteCheckBox.IsChecked =
+            false;
+
+        // The application starts idle.
         SetRunningState(false);
 
-        StatusText.Text = "آماده";
+        StatusText.Text =
+            "آماده";
 
         RefreshEditor();
 
-        SourceInitialized += MainWindow_SourceInitialized;
+        // Start the global F7 hook after the window has been
+        // constructed. The hook itself is independent of focus.
+        StartGlobalF7Hook();
     }
 
-    // ==============================
-    // Register F7
-    // ==============================
+    // ============================================================
+    // Global F7 hook
+    // ============================================================
 
-    private void MainWindow_SourceInitialized(
-        object? sender,
-        EventArgs e)
+    private void StartGlobalF7Hook()
     {
-        if (_hwndSource != null)
+        if (_keyboardHookHandle != IntPtr.Zero)
             return;
 
-        _hwndSource =
-            PresentationSource.FromVisual(this)
-            as HwndSource;
+        // Keep a strong reference to the delegate for as long as
+        // the native hook exists. Losing the delegate can cause
+        // the native callback to point at collected managed data.
+        _keyboardHookProc =
+            GlobalKeyboardHookCallback;
 
-        if (_hwndSource == null)
-            return;
+        IntPtr moduleHandle =
+            GetModuleHandle(null);
 
-        _hwndSource.AddHook(GlobalHotkeyWndProc);
+        _keyboardHookHandle =
+            SetWindowsHookEx(
+                WH_KEYBOARD_LL,
+                _keyboardHookProc,
+                moduleHandle,
+                0);
 
-        _hotkeyRegistered = RegisterHotKey(
-            _hwndSource.Handle,
-            HOTKEY_ID_STOP,
-            MOD_NOREPEAT,
-            VK_F7);
-
-        if (!_hotkeyRegistered)
+        if (_keyboardHookHandle == IntPtr.Zero)
         {
-            int error = Marshal.GetLastWin32Error();
+            int error =
+                Marshal.GetLastWin32Error();
 
             System.Diagnostics.Debug.WriteLine(
-                $"RegisterHotKey(F7) failed. Win32 error: {error}");
+                $"F7 keyboard hook failed. Win32 error: {error}");
         }
     }
 
-    // ==============================
-    // Global Hotkey Handler
-    // ==============================
-
-    private IntPtr GlobalHotkeyWndProc(
-        IntPtr hwnd,
-        int msg,
+    private IntPtr GlobalKeyboardHookCallback(
+        int nCode,
         IntPtr wParam,
-        IntPtr lParam,
-        ref bool handled)
+        IntPtr lParam)
     {
-        if (msg == WM_HOTKEY &&
-            wParam.ToInt32() == HOTKEY_ID_STOP)
+        if (nCode >= 0)
         {
-            handled = true;
+            int message =
+                wParam.ToInt32();
 
-            Dispatcher.BeginInvoke(
-                new Action(StopFromHotkey));
+            if (message == WM_KEYDOWN ||
+                message == WM_SYSKEYDOWN)
+            {
+                KBDLLHOOKSTRUCT keyboard =
+                    Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(
+                        lParam);
+
+                if (keyboard.vkCode ==
+                    (uint)VK_F7)
+                {
+                    // Do not touch WPF controls directly from the
+                    // native callback. Queue the operation on the
+                    // WPF dispatcher instead.
+                    Dispatcher.BeginInvoke(
+                        new Action(StopFromHotkey));
+                }
+            }
         }
 
-        return IntPtr.Zero;
+        return CallNextHookEx(
+            _keyboardHookHandle,
+            nCode,
+            wParam,
+            lParam);
     }
 
     private void StopFromHotkey()
     {
+        // F7 is deliberately a stop-only command.
+        // Pressing it while idle does nothing.
         if (!_runner.IsRunning)
             return;
 
-        StatusText.Text = "در حال توقف با F7...";
+        StatusText.Text =
+            "در حال توقف با F7...";
 
         _runner.Stop();
     }
 
-    // ==============================
-    // Window Close
-    // ==============================
-
-    protected override void OnClosed(EventArgs e)
+    private void StopGlobalF7Hook()
     {
-        if (_hwndSource != null)
+        if (_keyboardHookHandle != IntPtr.Zero)
         {
-            if (_hotkeyRegistered)
-            {
-                UnregisterHotKey(
-                    _hwndSource.Handle,
-                    HOTKEY_ID_STOP);
+            UnhookWindowsHookEx(
+                _keyboardHookHandle);
 
-                _hotkeyRegistered = false;
-            }
-
-            _hwndSource.RemoveHook(
-                GlobalHotkeyWndProc);
-
-            _hwndSource = null;
+            _keyboardHookHandle =
+                IntPtr.Zero;
         }
 
+        _keyboardHookProc =
+            null;
+    }
+
+    // ============================================================
+    // Window close
+    // ============================================================
+
+    protected override void OnClosed(
+        EventArgs e)
+    {
+        // Stop the native hook first so no new F7 callback is queued
+        // while the window is being destroyed.
+        StopGlobalF7Hook();
+
+        // Stop the click sequence if it is still active.
         _runner.Stop();
 
         base.OnClosed(e);
     }
 
-    // ==============================
-    // Add Point
-    // ==============================
+    // ============================================================
+    // Add point
+    // ============================================================
 
     private void AddPoint_Click(
         object sender,
@@ -180,14 +252,19 @@ public partial class MainWindow : Window
 
         try
         {
-            var picker = new PointPickerWindow
-            {
-                Owner = this
-            };
+            // The picker is shown while the main window is hidden,
+            // so the application does not accidentally sample its
+            // own controls.
+            var picker =
+                new PointPickerWindow
+                {
+                    Owner = this
+                };
 
             Hide();
 
-            bool? result = picker.ShowDialog();
+            bool? result =
+                picker.ShowDialog();
 
             Show();
             Activate();
@@ -200,42 +277,67 @@ public partial class MainWindow : Window
                 is not System.Windows.Point selectedPoint)
                 return;
 
-            int x = (int)Math.Round(selectedPoint.X);
-            int y = (int)Math.Round(selectedPoint.Y);
+            int x =
+                (int)Math.Round(
+                    selectedPoint.X);
 
+            int y =
+                (int)Math.Round(
+                    selectedPoint.Y);
+
+            // Store a representative color from the surrounding
+            // area, not merely one potentially noisy pixel.
             Color color =
                 _mouse.GetRepresentativeColor(
                     x,
                     y,
                     15);
 
-            var point = new ClickPoint
-            {
-                Number = _points.Count + 1,
+            var point =
+                new ClickPoint
+                {
+                    Number =
+                        _points.Count + 1,
 
-                X = x,
-                Y = y,
+                    X =
+                        x,
 
-                DelayMs = 1000,
+                    Y =
+                        y,
 
-                R = color.R,
-                G = color.G,
-                B = color.B,
+                    DelayMs =
+                        1000,
 
-                Tolerance = 20,
+                    R =
+                        color.R,
 
-                CheckMode = CheckMode.None,
+                    G =
+                        color.G,
 
-                SearchRadius = 15,
+                    B =
+                        color.B,
 
-                MinimumMatchPercent = 5
-            };
+                    Tolerance =
+                        20,
 
-            _points.Add(point);
+                    CheckMode =
+                        CheckMode.None,
 
-            PointsList.SelectedItem = point;
+                    SearchRadius =
+                        15,
 
-            PointsList.ScrollIntoView(point);
+                    MinimumMatchPercent =
+                        5
+                };
+
+            _points.Add(
+                point);
+
+            PointsList.SelectedItem =
+                point;
+
+            PointsList.ScrollIntoView(
+                point);
 
             RefreshEditor();
 
@@ -250,9 +352,9 @@ public partial class MainWindow : Window
         }
     }
 
-    // ==============================
-    // Selection Changed
-    // ==============================
+    // ============================================================
+    // Selection changed
+    // ============================================================
 
     private void PointsList_SelectionChanged(
         object sender,
@@ -261,24 +363,30 @@ public partial class MainWindow : Window
         RefreshEditor();
     }
 
-    // ==============================
-    // Refresh Editor
-    // ==============================
+    // ============================================================
+    // Refresh editor
+    // ============================================================
 
     private void RefreshEditor()
     {
+        // No point selected.
         if (PointsList.SelectedItem
             is not ClickPoint point)
         {
-            ColorInfoText.Text = "—";
+            ColorInfoText.Text =
+                "—";
 
-            DelayBox.Text = "1.0";
+            DelayBox.Text =
+                "1.0";
 
-            ToleranceBox.Text = "20";
+            ToleranceBox.Text =
+                "20";
 
-            SearchRadiusBox.Text = "15";
+            SearchRadiusBox.Text =
+                "15";
 
-            MinimumMatchPercentBox.Text = "5";
+            MinimumMatchPercentBox.Text =
+                "5";
 
             DelayLabel.Text =
                 "فاصله کلیک → کلیک بعدی (ثانیه)";
@@ -286,6 +394,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Convert milliseconds back to seconds for the UI.
         DelayBox.Text =
             (point.DelayMs / 1000.0)
             .ToString(
@@ -315,7 +424,10 @@ public partial class MainWindow : Window
         if (index >= 0 &&
             index < _points.Count)
         {
-            int nextIndex = index + 1;
+            // The selected point owns the delay before the next
+            // point. For the final point, the next point is point 1.
+            int nextIndex =
+                index + 1;
 
             if (nextIndex >= _points.Count)
                 nextIndex = 0;
@@ -335,9 +447,9 @@ public partial class MainWindow : Window
         }
     }
 
-    // ==============================
-    // Apply Delay
-    // ==============================
+    // ============================================================
+    // Apply delay
+    // ============================================================
 
     private void ApplyDelay_Click(
         object sender,
@@ -357,8 +469,10 @@ public partial class MainWindow : Window
 
         string text =
             DelayBox.Text
-            .Trim()
-            .Replace(',', '.');
+                .Trim()
+                .Replace(
+                    ',',
+                    '.');
 
         if (!double.TryParse(
                 text,
@@ -392,7 +506,8 @@ public partial class MainWindow : Window
         double milliseconds =
             seconds * 1000.0;
 
-        if (milliseconds > int.MaxValue)
+        if (milliseconds >
+            int.MaxValue)
         {
             ShowWarning(
                 "مقدار فاصله بیش از حد بزرگ است.");
@@ -401,12 +516,14 @@ public partial class MainWindow : Window
         }
 
         point.DelayMs =
-            (int)Math.Round(milliseconds);
+            (int)Math.Round(
+                milliseconds);
 
         PointsList.Items.Refresh();
 
         RefreshEditor();
 
+        // Calculate the exact destination of this delay.
         int index =
             PointsList.SelectedIndex;
 
@@ -416,7 +533,8 @@ public partial class MainWindow : Window
         if (index >= 0 &&
             index < _points.Count)
         {
-            if (index + 1 < _points.Count)
+            if (index + 1 <
+                _points.Count)
             {
                 nextNumber =
                     _points[index + 1].Number;
@@ -434,9 +552,9 @@ public partial class MainWindow : Window
             $"به {point.DelayText} تغییر کرد.";
     }
 
-    // ==============================
-    // Enable Color Check
-    // ==============================
+    // ============================================================
+    // Enable color check
+    // ============================================================
 
     private void EnableColorCheck_Click(
         object sender,
@@ -485,9 +603,9 @@ public partial class MainWindow : Window
             $"حداقل تطابق={minimumMatchPercent}%";
     }
 
-    // ==============================
-    // Disable Color Check
-    // ==============================
+    // ============================================================
+    // Disable color check
+    // ============================================================
 
     private void DisableColorCheck_Click(
         object sender,
@@ -512,18 +630,23 @@ public partial class MainWindow : Window
             $"{point.Number} غیرفعال شد.";
     }
 
-    // ==============================
-    // Read Color Settings
-    // ==============================
+    // ============================================================
+    // Read color settings
+    // ============================================================
 
     private bool TryReadColorSettings(
         out int tolerance,
         out int searchRadius,
         out int minimumMatchPercent)
     {
-        tolerance = 0;
-        searchRadius = 15;
-        minimumMatchPercent = 5;
+        tolerance =
+            0;
+
+        searchRadius =
+            15;
+
+        minimumMatchPercent =
+            5;
 
         string toleranceText =
             ToleranceBox.Text.Trim();
@@ -600,9 +723,9 @@ public partial class MainWindow : Window
         return true;
     }
 
-    // ==============================
+    // ============================================================
     // Start
-    // ==============================
+    // ============================================================
 
     private async void Start_Click(
         object sender,
@@ -622,7 +745,8 @@ public partial class MainWindow : Window
         bool infinite =
             InfiniteCheckBox.IsChecked == true;
 
-        int repeatCount = 1;
+        int repeatCount =
+            1;
 
         if (!infinite)
         {
@@ -649,11 +773,14 @@ public partial class MainWindow : Window
 
         try
         {
-            SetRunningState(true);
+            SetRunningState(
+                true);
 
             StatusText.Text =
                 "در حال اجرا...";
 
+            // Use a snapshot so the UI collection cannot be changed
+            // while the runner is processing the sequence.
             var pointsSnapshot =
                 _points.ToList();
 
@@ -661,26 +788,26 @@ public partial class MainWindow : Window
                 pointsSnapshot,
                 repeatCount,
                 infinite,
-
                 status =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        StatusText.Text =
-                            status;
-                    });
+                    Dispatcher.Invoke(
+                        () =>
+                        {
+                            StatusText.Text =
+                                status;
+                        });
                 },
-
                 point =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        PointsList.SelectedItem =
-                            point;
+                    Dispatcher.Invoke(
+                        () =>
+                        {
+                            PointsList.SelectedItem =
+                                point;
 
-                        PointsList.ScrollIntoView(
-                            point);
-                    });
+                            PointsList.ScrollIntoView(
+                                point);
+                        });
                 });
         }
         catch (OperationCanceledException)
@@ -690,11 +817,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex);
+            ShowError(
+                ex);
         }
         finally
         {
-            SetRunningState(false);
+            SetRunningState(
+                false);
 
             if (!_runner.IsRunning)
             {
@@ -708,9 +837,9 @@ public partial class MainWindow : Window
         }
     }
 
-    // ==============================
-    // Stop Button
-    // ==============================
+    // ============================================================
+    // Stop button
+    // ============================================================
 
     private void Stop_Click(
         object sender,
@@ -730,9 +859,9 @@ public partial class MainWindow : Window
         _runner.Stop();
     }
 
-    // ==============================
-    // Delete Point
-    // ==============================
+    // ============================================================
+    // Delete point
+    // ============================================================
 
     private void DeletePoint_Click(
         object sender,
@@ -750,8 +879,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        _points.Remove(point);
+        _points.Remove(
+            point);
 
+        // Renumber the remaining points.
         for (int i = 0;
              i < _points.Count;
              i++)
@@ -786,9 +917,9 @@ public partial class MainWindow : Window
             "نقطه حذف شد.";
     }
 
-    // ==============================
-    // Edit Color
-    // ==============================
+    // ============================================================
+    // Edit / recapture point color
+    // ============================================================
 
     private void EditColor_Click(
         object sender,
@@ -820,9 +951,14 @@ public partial class MainWindow : Window
                     point.Y,
                     radius);
 
-            point.R = color.R;
-            point.G = color.G;
-            point.B = color.B;
+            point.R =
+                color.R;
+
+            point.G =
+                color.G;
+
+            point.B =
+                color.B;
 
             PointsList.Items.Refresh();
 
@@ -835,13 +971,14 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex);
+            ShowError(
+                ex);
         }
     }
 
-    // ==============================
-    // Infinite
-    // ==============================
+    // ============================================================
+    // Infinite mode
+    // ============================================================
 
     private void Infinite_Checked(
         object sender,
@@ -865,13 +1002,14 @@ public partial class MainWindow : Window
             true;
     }
 
-    // ==============================
-    // Running State
-    // ==============================
+    // ============================================================
+    // Running-state UI
+    // ============================================================
 
     private void SetRunningState(
         bool running)
     {
+        // Point management.
         AddPointButton.IsEnabled =
             !running;
 
@@ -881,13 +1019,72 @@ public partial class MainWindow : Window
         EditColorButton.IsEnabled =
             !running;
 
+        // Start/stop.
         StartButton.IsEnabled =
             !running;
 
         StopButton.IsEnabled =
             running;
 
+        // Editor.
         DelayBox.IsEnabled =
             !running;
 
-   
+        ToleranceBox.IsEnabled =
+            !running;
+
+        SearchRadiusBox.IsEnabled =
+            !running;
+
+        MinimumMatchPercentBox.IsEnabled =
+            !running;
+
+        // Repeat settings.
+        InfiniteCheckBox.IsEnabled =
+            !running;
+
+        RepeatCountBox.IsEnabled =
+            !running &&
+            InfiniteCheckBox.IsChecked != true;
+    }
+
+    // ============================================================
+    // Message helpers
+    // ============================================================
+
+    private void ShowInformation(
+        string message)
+    {
+        MessageBox.Show(
+            message,
+            "توجه",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    private void ShowWarning(
+        string message)
+    {
+        MessageBox.Show(
+            message,
+            "خطا",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
+    private void ShowError(
+        Exception ex)
+    {
+        Show();
+
+        MessageBox.Show(
+            ex.Message,
+            "خطا",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+
+        StatusText.Text =
+            "خطا";
+    }
+
+}
